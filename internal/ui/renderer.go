@@ -145,7 +145,8 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 	}
 	details = append(details, nameStr)
 
-	categoryStr := fmt.Sprintf("Category: %s", template.Category)
+	displayName := r.templateManager.GetCategoryDisplayName(template.Category)
+	categoryStr := fmt.Sprintf("Type: %s", displayName)
 	if maxWidth > 0 {
 		categoryStr = r.TruncateText(categoryStr, maxWidth)
 	}

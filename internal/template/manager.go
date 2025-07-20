@@ -75,15 +75,30 @@ func (m *Manager) scanDirectory(rootPath string) []models.Template {
 func (m *Manager) GetCategoryPrefix(category string) string {
 	switch category {
 	case "account_templates":
-		return "A"
+		return "AT"
 	case "export_files":
-		return "E"
+		return "EF"
 	case "reconciliation_texts":
-		return "R"
+		return "RT"
 	case "shared_parts":
-		return "S"
+		return "SP"
 	default:
 		return "?"
+	}
+}
+
+func (m *Manager) GetCategoryDisplayName(category string) string {
+	switch category {
+	case "account_templates":
+		return "Account Template"
+	case "export_files":
+		return "Export File"
+	case "reconciliation_texts":
+		return "Reconciliation Text"
+	case "shared_parts":
+		return "Shared Part"
+	default:
+		return category
 	}
 }
 

@@ -18,10 +18,10 @@ func TestGetCategoryPrefix(t *testing.T) {
 		category string
 		expected string
 	}{
-		{"account_templates", "A"},
-		{"export_files", "E"},
-		{"reconciliation_texts", "R"},
-		{"shared_parts", "S"},
+		{"account_templates", "AT"},
+		{"export_files", "EF"},
+		{"reconciliation_texts", "RT"},
+		{"shared_parts", "SP"},
 		{"unknown", "?"},
 	}
 
@@ -29,6 +29,28 @@ func TestGetCategoryPrefix(t *testing.T) {
 		result := manager.GetCategoryPrefix(test.category)
 		if result != test.expected {
 			t.Errorf("GetCategoryPrefix(%s) = %s, expected %s", test.category, result, test.expected)
+		}
+	}
+}
+
+func TestGetCategoryDisplayName(t *testing.T) {
+	manager := template.NewManager()
+
+	tests := []struct {
+		category string
+		expected string
+	}{
+		{"account_templates", "Account Template"},
+		{"export_files", "Export File"},
+		{"reconciliation_texts", "Reconciliation Text"},
+		{"shared_parts", "Shared Part"},
+		{"unknown", "unknown"},
+	}
+
+	for _, test := range tests {
+		result := manager.GetCategoryDisplayName(test.category)
+		if result != test.expected {
+			t.Errorf("GetCategoryDisplayName(%s) = %s, expected %s", test.category, result, test.expected)
 		}
 	}
 }
@@ -227,8 +249,8 @@ func TestUIRenderer(t *testing.T) {
 	if !strings.Contains(view, "test1") {
 		t.Errorf("Templates view should contain 'test1'")
 	}
-	if !strings.Contains(view, "[A]") {
-		t.Errorf("Templates view should contain category prefix [A]")
+	if !strings.Contains(view, "[AT]") {
+		t.Errorf("Templates view should contain category prefix [AT]")
 	}
 
 	// Test details view
