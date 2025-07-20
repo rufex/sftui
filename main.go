@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -32,6 +33,12 @@ func newApp() *app {
 }
 
 func (a *app) initialModel() *models.Model {
+	// Initialize host text input
+	hostTextInput := textinput.New()
+	hostTextInput.Placeholder = "Enter host URL (e.g., https://api.example.com)"
+	hostTextInput.CharLimit = 256
+	hostTextInput.Width = 50
+
 	a.model = &models.Model{
 		CurrentSection:    models.TemplatesSection,
 		SelectedTemplate:  0,
@@ -39,6 +46,7 @@ func (a *app) initialModel() *models.Model {
 		SelectedTemplates: make(map[int]bool),
 		Firm:              "No firm set",
 		Host:              "No host set",
+		HostTextInput:     hostTextInput,
 		ShowHelp:          false,
 		Output:            "Ready",
 	}
@@ -138,7 +146,7 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				if len(a.model.FirmOptions) > 0 && a.model.SelectedFirm < len(a.model.FirmOptions) {
 					selectedOption := a.model.FirmOptions[a.model.SelectedFirm]
-					
+
 					// Update config file
 					err := a.configManager.SetDefaultFirm(selectedOption.ID)
 					if err != nil {
@@ -148,13 +156,44 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						a.model.Firm = fmt.Sprintf("%s (%s)", selectedOption.Name, selectedOption.ID)
 						a.model.Output = fmt.Sprintf("Default firm set to %s", selectedOption.Name)
 					}
-					
+
 					a.model.ShowFirmPopup = false
 					a.model.SelectedFirm = 0
 				}
 				return a, nil
 			}
 			return a, nil
+		}
+
+		// Handle host popup
+		if a.model.ShowHostPopup {
+			switch msg.String() {
+			case "esc":
+				a.model.ShowHostPopup = false
+				a.model.HostTextInput.Blur()
+				a.model.Output = "Host edit cancelled"
+				return a, nil
+			case "enter":
+				// Save the new host
+				newHost := a.model.HostTextInput.Value()
+				err := a.configManager.SetHost(newHost)
+				if err != nil {
+					a.model.Output = fmt.Sprintf("Error setting host: %v", err)
+				} else {
+					// Update display and close popup
+					a.model.Host = newHost
+					a.model.Output = "Host updated successfully"
+				}
+
+				a.model.ShowHostPopup = false
+				a.model.HostTextInput.Blur()
+				return a, nil
+			default:
+				// Handle all other input through the textinput model
+				var cmd tea.Cmd
+				a.model.HostTextInput, cmd = a.model.HostTextInput.Update(msg)
+				return a, cmd
+			}
 		}
 
 		// Handle special cases first
@@ -297,11 +336,18 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 
-		case "enter": // Trigger action popup when templates are selected, or firm popup when in firm section
+		case "enter": // Trigger action popup when templates are selected, firm popup when in firm section, or host popup when in host section
 			if a.model.CurrentSection == models.FirmSection {
 				a.model.ShowFirmPopup = true
 				a.model.SelectedFirm = 0
 				a.model.Output = "Select a firm or partner"
+			} else if a.model.CurrentSection == models.HostSection {
+				a.model.ShowHostPopup = true
+				// Set current host value and focus the input
+				a.model.HostTextInput.SetValue(a.model.Host)
+				a.model.HostTextInput.Focus()
+				a.model.HostTextInput.CursorEnd()
+				a.model.Output = "Edit host URL"
 			} else if a.model.CurrentSection == models.TemplatesSection && len(a.model.SelectedTemplates) > 0 {
 				a.model.ShowActionPopup = true
 				a.model.SelectedAction = 0
@@ -330,6 +376,10 @@ func (a *app) View() string {
 
 	if a.model.ShowFirmPopup {
 		return a.uiRenderer.FirmPopupView(a.model)
+	}
+
+	if a.model.ShowHostPopup {
+		return a.uiRenderer.HostPopupView(a.model)
 	}
 
 	if a.model.Height < 10 {

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -48,6 +49,8 @@ type Model struct {
 	ShowFirmPopup     bool
 	SelectedFirm      int
 	FirmOptions       []FirmOption
+	ShowHostPopup     bool
+	HostTextInput     textinput.Model
 	Firm              string
 	Host              string
 	ShowHelp          bool

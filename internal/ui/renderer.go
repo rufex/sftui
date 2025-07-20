@@ -288,7 +288,7 @@ func (r *Renderer) FirmPopupView(m *models.Model) string {
 	// Build popup content
 	var content strings.Builder
 	content.WriteString("Select Default Firm/Partner\n\n")
-	
+
 	// Firm and partner options
 	for i, option := range m.FirmOptions {
 		prefix := "  "
@@ -301,31 +301,31 @@ func (r *Renderer) FirmPopupView(m *models.Model) string {
 		}
 		content.WriteString("\n")
 	}
-	
+
 	if len(m.FirmOptions) == 0 {
 		content.WriteString("No firms or partners available\n")
 	}
-	
+
 	content.WriteString("\nUse ↑/↓ or k/j to navigate")
 	content.WriteString("\nPress ENTER to select, ESC to cancel")
-	
+
 	// Calculate popup dimensions (wider for firm names)
 	popupWidth := 50
 	popupHeight := min(15, len(m.FirmOptions)+8) // Dynamic height based on options
-	
+
 	// Center the popup
 	leftMargin := max(0, (m.Width-popupWidth)/2)
 	topMargin := max(0, (m.Height-popupHeight)/2)
-	
+
 	popupBox := models.ActiveBorderStyle.
 		Width(popupWidth).
 		Height(popupHeight).
 		Padding(1).
 		Render(content.String())
-	
+
 	// Add top margin using newlines
 	centeredPopup := strings.Repeat("\n", topMargin) + popupBox
-	
+
 	// Add left margin using spaces
 	lines := strings.Split(centeredPopup, "\n")
 	for i, line := range lines {
@@ -333,7 +333,49 @@ func (r *Renderer) FirmPopupView(m *models.Model) string {
 			lines[i] = strings.Repeat(" ", leftMargin) + line
 		}
 	}
-	
+
+	return strings.Join(lines, "\n")
+}
+
+func (r *Renderer) HostPopupView(m *models.Model) string {
+	// Build popup content
+	var content strings.Builder
+	content.WriteString("Edit Host URL\n\n")
+
+	// Use the textinput view for a much better experience
+	content.WriteString("Host: ")
+	content.WriteString(m.HostTextInput.View())
+	content.WriteString("\n\n")
+
+	content.WriteString("Type to edit the host URL")
+	content.WriteString("\nUse ←/→ to move cursor, Ctrl+A/E for start/end")
+	content.WriteString("\nPress ENTER to save, ESC to cancel")
+
+	// Calculate popup dimensions (wider for URL input)
+	popupWidth := 70
+	popupHeight := 10
+
+	// Center the popup
+	leftMargin := max(0, (m.Width-popupWidth)/2)
+	topMargin := max(0, (m.Height-popupHeight)/2)
+
+	popupBox := models.ActiveBorderStyle.
+		Width(popupWidth).
+		Height(popupHeight).
+		Padding(1).
+		Render(content.String())
+
+	// Add top margin using newlines
+	centeredPopup := strings.Repeat("\n", topMargin) + popupBox
+
+	// Add left margin using spaces
+	lines := strings.Split(centeredPopup, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = strings.Repeat(" ", leftMargin) + line
+		}
+	}
+
 	return strings.Join(lines, "\n")
 }
 

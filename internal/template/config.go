@@ -164,3 +164,31 @@ func (c *ConfigManager) SetDefaultFirm(firmID string) error {
 
 	return os.WriteFile(configPath, newData, 0644)
 }
+
+func (c *ConfigManager) SetHost(host string) error {
+	configPath, err := c.getConfigPath()
+	if err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+
+	var rawConfig map[string]interface{}
+	if err := json.Unmarshal(data, &rawConfig); err != nil {
+		return err
+	}
+
+	// Set the host
+	rawConfig["host"] = host
+
+	// Write back to file
+	newData, err := json.MarshalIndent(rawConfig, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configPath, newData, 0644)
+}

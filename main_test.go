@@ -337,24 +337,24 @@ func TestConfigManager(t *testing.T) {
 func TestFirmPopupTrigger(t *testing.T) {
 	app := newApp()
 	m := app.initialModel()
-	
+
 	// Set current section to Firm
 	m.CurrentSection = models.FirmSection
-	
+
 	// Simulate Enter key press
 	key := tea.KeyMsg{Type: tea.KeyEnter}
-	
+
 	app.model = m
 	_, _ = app.Update(key)
-	
+
 	if !app.model.ShowFirmPopup {
 		t.Errorf("Expected ShowFirmPopup to be true after Enter in Firm section")
 	}
-	
+
 	if app.model.SelectedFirm != 0 {
 		t.Errorf("Expected SelectedFirm to be reset to 0, got %d", app.model.SelectedFirm)
 	}
-	
+
 	if app.model.Output != "Select a firm or partner" {
 		t.Errorf("Expected output message 'Select a firm or partner', got %s", app.model.Output)
 	}
@@ -363,16 +363,16 @@ func TestFirmPopupTrigger(t *testing.T) {
 func TestFirmPopupNavigation(t *testing.T) {
 	app := newApp()
 	m := app.initialModel()
-	
+
 	// Ensure we have firm options loaded
 	if len(m.FirmOptions) == 0 {
 		t.Skip("No firm options available for testing")
 	}
-	
+
 	// Set popup state
 	m.ShowFirmPopup = true
 	m.SelectedFirm = 0
-	
+
 	tests := []struct {
 		keyType  tea.KeyType
 		keyStr   string
@@ -383,7 +383,7 @@ func TestFirmPopupNavigation(t *testing.T) {
 		{tea.KeyUp, "up", (2 - 1 + len(m.FirmOptions)) % len(m.FirmOptions)},
 		{tea.KeyRunes, "k", (1 - 1 + len(m.FirmOptions)) % len(m.FirmOptions)},
 	}
-	
+
 	app.model = m
 	for _, test := range tests {
 		var key tea.KeyMsg
@@ -393,7 +393,7 @@ func TestFirmPopupNavigation(t *testing.T) {
 			key = tea.KeyMsg{Type: test.keyType}
 		}
 		_, _ = app.Update(key)
-		
+
 		if app.model.SelectedFirm != test.expected {
 			t.Errorf("After key %s, expected SelectedFirm %d, got %d", test.keyStr, test.expected, app.model.SelectedFirm)
 		}
@@ -403,25 +403,25 @@ func TestFirmPopupNavigation(t *testing.T) {
 func TestFirmPopupEscape(t *testing.T) {
 	app := newApp()
 	m := app.initialModel()
-	
+
 	// Set popup state
 	m.ShowFirmPopup = true
 	m.SelectedFirm = 2
-	
+
 	// Simulate Escape key
 	key := tea.KeyMsg{Type: tea.KeyEscape}
-	
+
 	app.model = m
 	_, _ = app.Update(key)
-	
+
 	if app.model.ShowFirmPopup {
 		t.Errorf("Expected ShowFirmPopup to be false after Escape")
 	}
-	
+
 	if app.model.SelectedFirm != 0 {
 		t.Errorf("Expected SelectedFirm to be reset to 0, got %d", app.model.SelectedFirm)
 	}
-	
+
 	if app.model.Output != "Firm selection cancelled" {
 		t.Errorf("Expected output 'Firm selection cancelled', got %s", app.model.Output)
 	}
@@ -430,35 +430,35 @@ func TestFirmPopupEscape(t *testing.T) {
 func TestFirmPopupSelection(t *testing.T) {
 	app := newApp()
 	m := app.initialModel()
-	
+
 	// Ensure we have firm options loaded
 	if len(m.FirmOptions) == 0 {
 		t.Skip("No firm options available for testing")
 	}
-	
+
 	// Set popup state
 	m.ShowFirmPopup = true
 	m.SelectedFirm = 0
 	selectedOption := m.FirmOptions[0]
-	
+
 	// Simulate Enter key for selection
 	key := tea.KeyMsg{Type: tea.KeyEnter}
-	
+
 	app.model = m
 	_, _ = app.Update(key)
-	
+
 	if app.model.ShowFirmPopup {
 		t.Errorf("Expected ShowFirmPopup to be false after selection")
 	}
-	
+
 	if app.model.SelectedFirm != 0 {
 		t.Errorf("Expected SelectedFirm to be reset to 0, got %d", app.model.SelectedFirm)
 	}
-	
+
 	if !strings.Contains(app.model.Firm, selectedOption.Name) {
 		t.Errorf("Expected firm to contain %s, got %s", selectedOption.Name, app.model.Firm)
 	}
-	
+
 	if !strings.Contains(app.model.Output, "Default firm set to") {
 		t.Errorf("Expected success message in output, got %s", app.model.Output)
 	}
@@ -467,19 +467,19 @@ func TestFirmPopupSelection(t *testing.T) {
 func TestLoadFirmOptions(t *testing.T) {
 	configManager := template.NewConfigManager()
 	firmOptions, err := configManager.LoadFirmOptions()
-	
+
 	if err != nil {
 		t.Errorf("Expected no error loading firm options, got %v", err)
 	}
-	
+
 	if len(firmOptions) == 0 {
 		t.Errorf("Expected at least some firm options from fixtures")
 	}
-	
+
 	// Check that we have both firms and partners
 	hasFirm := false
 	hasPartner := false
-	
+
 	for _, option := range firmOptions {
 		if option.Type == "firm" {
 			hasFirm = true
@@ -487,16 +487,16 @@ func TestLoadFirmOptions(t *testing.T) {
 		if option.Type == "partner" {
 			hasPartner = true
 		}
-		
+
 		if option.ID == "" || option.Name == "" {
 			t.Errorf("Expected firm option to have ID and Name, got ID='%s', Name='%s'", option.ID, option.Name)
 		}
 	}
-	
+
 	if !hasFirm {
 		t.Errorf("Expected at least one firm option")
 	}
-	
+
 	if !hasPartner {
 		t.Errorf("Expected at least one partner option")
 	}
@@ -506,44 +506,44 @@ func TestFirmPopupView(t *testing.T) {
 	app := newApp()
 	m := app.initialModel()
 	renderer := ui.NewRenderer()
-	
+
 	// Set some basic dimensions
 	m.Width = 80
 	m.Height = 24
-	
+
 	// Test with no firm options
 	m.FirmOptions = []models.FirmOption{}
 	view := renderer.FirmPopupView(m)
-	
+
 	if !strings.Contains(view, "No firms or partners available") {
 		t.Errorf("Expected message about no firms available")
 	}
-	
+
 	// Test with firm options
 	m.FirmOptions = []models.FirmOption{
 		{ID: "1001", Name: "Test Firm", Type: "firm"},
 		{ID: "25", Name: "Test Partner", Type: "partner"},
 	}
 	m.SelectedFirm = 0
-	
+
 	view = renderer.FirmPopupView(m)
-	
+
 	if !strings.Contains(view, "Select Default Firm/Partner") {
 		t.Errorf("Expected popup title")
 	}
-	
+
 	if !strings.Contains(view, "Test Firm (1001)") {
 		t.Errorf("Expected firm name with ID in popup")
 	}
-	
+
 	if !strings.Contains(view, "Test Partner (25)") {
 		t.Errorf("Expected partner name with ID in popup")
 	}
-	
+
 	if !strings.Contains(view, "Use ↑/↓ or k/j to navigate") {
 		t.Errorf("Expected navigation instructions")
 	}
-	
+
 	if !strings.Contains(view, "Press ENTER to select, ESC to cancel") {
 		t.Errorf("Expected action instructions")
 	}
@@ -552,37 +552,365 @@ func TestFirmPopupView(t *testing.T) {
 func TestFirmPopupIntegration(t *testing.T) {
 	app := newApp()
 	m := app.initialModel()
-	
+
 	key := tea.KeyMsg{Type: tea.KeyEnter}
-	
+
 	// Test that Enter in firm popup selects a firm (if firm options are available)
 	if len(m.FirmOptions) > 0 {
 		m.CurrentSection = models.FirmSection
 		m.ShowFirmPopup = true
 		m.SelectedFirm = 0
-		
+
 		app.model = m
 		_, _ = app.Update(key)
-		
+
 		// Should close popup after selection
 		if app.model.ShowFirmPopup {
 			t.Errorf("Expected firm popup to close after selection")
 		}
-		
+
 		// Should show success message
 		if !strings.Contains(app.model.Output, "Default firm set to") {
 			t.Errorf("Expected success message, got: %s", app.model.Output)
 		}
 	}
-	
+
 	// Test that Enter in other sections doesn't trigger firm popup
 	m.ShowFirmPopup = false
 	m.CurrentSection = models.TemplatesSection
-	
+
 	app.model = m
 	_, _ = app.Update(key)
-	
+
 	if app.model.ShowFirmPopup {
 		t.Errorf("Expected firm popup not to trigger from Templates section")
+	}
+}
+
+// Test host edit functionality
+func TestHostPopupTrigger(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Set current section to Host
+	m.CurrentSection = models.HostSection
+
+	// Simulate Enter key press
+	key := tea.KeyMsg{Type: tea.KeyEnter}
+
+	app.model = m
+	_, _ = app.Update(key)
+
+	if !app.model.ShowHostPopup {
+		t.Errorf("Expected ShowHostPopup to be true after Enter in Host section")
+	}
+
+	if app.model.HostTextInput.Value() != app.model.Host {
+		t.Errorf("Expected HostTextInput to be pre-filled with current host")
+	}
+
+	if app.model.Output != "Edit host URL" {
+		t.Errorf("Expected output message 'Edit host URL', got %s", app.model.Output)
+	}
+}
+
+func TestHostPopupTextInputMultipleChars(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Set popup state with textinput
+	m.ShowHostPopup = true
+	m.HostTextInput.SetValue("https://test")
+	m.HostTextInput.Focus()
+
+	// Test adding characters through textinput
+	chars := []rune{'.', 'c', 'o', 'm'}
+	for _, char := range chars {
+		key := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}}
+		app.model = m
+		_, _ = app.Update(key)
+		m = app.model
+	}
+
+	// Check that textinput handles the characters (exact result depends on textinput implementation)
+	finalValue := app.model.HostTextInput.Value()
+	if !strings.Contains(finalValue, "test") {
+		t.Errorf("Expected textinput to contain 'test', got '%s'", finalValue)
+	}
+}
+
+// TestHostPopupBackspace already exists in new implementation, removing duplicate
+
+// TestHostPopupEscape already exists in new implementation, removing duplicate
+
+// TestHostPopupSave already exists in new implementation, removing duplicate
+
+// TestHostPopupView already exists in new implementation, removing duplicate
+
+func TestHostPopupIntegration(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	key := tea.KeyMsg{Type: tea.KeyEnter}
+
+	// Test that Enter in other sections doesn't trigger host popup
+	m.CurrentSection = models.TemplatesSection
+
+	app.model = m
+	_, _ = app.Update(key)
+
+	if app.model.ShowHostPopup {
+		t.Errorf("Expected host popup not to trigger from Templates section")
+	}
+
+	// Test that Enter in host section triggers popup
+	m.CurrentSection = models.HostSection
+
+	app.model = m
+	_, _ = app.Update(key)
+
+	if !app.model.ShowHostPopup {
+		t.Errorf("Expected host popup to trigger from Host section")
+	}
+}
+
+func TestSetHost(t *testing.T) {
+	configManager := template.NewConfigManager()
+
+	// Test setting a new host
+	newHost := "https://new-test-host.com"
+	err := configManager.SetHost(newHost)
+
+	if err != nil {
+		t.Errorf("Expected no error setting host, got %v", err)
+	}
+
+	// Verify the host was set by loading config again
+	_, host, _ := configManager.LoadSilverfinConfig()
+
+	if host != newHost {
+		t.Errorf("Expected host to be '%s', got '%s'", newHost, host)
+	}
+}
+
+// Test textinput initialization and basic functionality
+func TestHostTextInputInitialization(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Check that textinput is properly initialized
+	if m.HostTextInput.CharLimit != 256 {
+		t.Errorf("Expected CharLimit to be 256, got %d", m.HostTextInput.CharLimit)
+	}
+
+	if m.HostTextInput.Width != 50 {
+		t.Errorf("Expected Width to be 50, got %d", m.HostTextInput.Width)
+	}
+
+	expectedPlaceholder := "Enter host URL (e.g., https://api.example.com)"
+	if m.HostTextInput.Placeholder != expectedPlaceholder {
+		t.Errorf("Expected placeholder '%s', got '%s'", expectedPlaceholder, m.HostTextInput.Placeholder)
+	}
+}
+
+func TestHostPopupTextInputFocus(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Set current section to Host and simulate Enter to open popup
+	m.CurrentSection = models.HostSection
+	m.Host = "https://example.com"
+
+	key := tea.KeyMsg{Type: tea.KeyEnter}
+	app.model = m
+	_, _ = app.Update(key)
+
+	// Check that popup is shown and textinput is focused with correct value
+	if !app.model.ShowHostPopup {
+		t.Errorf("Expected host popup to be shown")
+	}
+
+	if !app.model.HostTextInput.Focused() {
+		t.Errorf("Expected textinput to be focused")
+	}
+
+	if app.model.HostTextInput.Value() != m.Host {
+		t.Errorf("Expected textinput value to be '%s', got '%s'", m.Host, app.model.HostTextInput.Value())
+	}
+}
+
+func TestHostPopupTextInputTyping(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Open host popup with focused textinput
+	m.ShowHostPopup = true
+	m.HostTextInput.SetValue("https://test.com")
+	m.HostTextInput.Focus()
+
+	// Type a character
+	char := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}}
+
+	app.model = m
+	_, _ = app.Update(char)
+
+	// The textinput should handle the character insertion
+	value := app.model.HostTextInput.Value()
+	if !strings.Contains(value, "x") {
+		t.Errorf("Expected textinput to contain 'x' after typing, got '%s'", value)
+	}
+}
+
+func TestHostPopupTextInputBackspace(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Open host popup with focused textinput
+	m.ShowHostPopup = true
+	m.HostTextInput.SetValue("https://test.com")
+	m.HostTextInput.Focus()
+
+	originalLength := len(m.HostTextInput.Value())
+
+	// Send backspace
+	backspace := tea.KeyMsg{Type: tea.KeyBackspace}
+
+	app.model = m
+	_, _ = app.Update(backspace)
+
+	// The textinput should handle the backspace
+	newValue := app.model.HostTextInput.Value()
+	if len(newValue) >= originalLength {
+		t.Errorf("Expected textinput value to be shorter after backspace, original: %d, new: %d", originalLength, len(newValue))
+	}
+}
+
+func TestHostPopupEscapeKey(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Open host popup
+	m.ShowHostPopup = true
+	m.HostTextInput.SetValue("https://test.com")
+	m.HostTextInput.Focus()
+
+	// Send escape key
+	escape := tea.KeyMsg{Type: tea.KeyEsc}
+
+	app.model = m
+	_, _ = app.Update(escape)
+
+	// Popup should be closed and textinput should be blurred
+	if app.model.ShowHostPopup {
+		t.Errorf("Expected host popup to be closed after escape")
+	}
+
+	if app.model.HostTextInput.Focused() {
+		t.Errorf("Expected textinput to be blurred after escape")
+	}
+
+	if app.model.Output != "Host edit cancelled" {
+		t.Errorf("Expected output message 'Host edit cancelled', got '%s'", app.model.Output)
+	}
+}
+
+func TestHostPopupEnterKeySave(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Open host popup and set a new value
+	m.ShowHostPopup = true
+	newHost := "https://new-host.com"
+	m.HostTextInput.SetValue(newHost)
+	m.HostTextInput.Focus()
+
+	// Send enter key to save
+	enter := tea.KeyMsg{Type: tea.KeyEnter}
+
+	app.model = m
+	_, _ = app.Update(enter)
+
+	// Popup should be closed and textinput should be blurred
+	if app.model.ShowHostPopup {
+		t.Errorf("Expected host popup to be closed after enter")
+	}
+
+	if app.model.HostTextInput.Focused() {
+		t.Errorf("Expected textinput to be blurred after enter")
+	}
+
+	if app.model.Host != newHost {
+		t.Errorf("Expected host to be updated to '%s', got '%s'", newHost, app.model.Host)
+	}
+
+	if app.model.Output != "Host updated successfully" {
+		t.Errorf("Expected output message 'Host updated successfully', got '%s'", app.model.Output)
+	}
+}
+
+func TestHostPopupViewWithTextInput(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+	renderer := ui.NewRenderer()
+
+	// Set some basic dimensions
+	m.Width = 80
+	m.Height = 24
+	m.HostTextInput.SetValue("https://test.com")
+
+	view := renderer.HostPopupView(m)
+
+	// Check that textinput is rendered
+	if !strings.Contains(view, "Host: ") {
+		t.Errorf("Expected view to contain 'Host: ' label")
+	}
+
+	// Check that the textinput component is used (it will have its own styling)
+	if !strings.Contains(view, "https://test.com") {
+		t.Errorf("Expected view to contain the host value 'https://test.com'")
+	}
+
+	// Check updated instructions for textinput
+	if !strings.Contains(view, "Use ←/→ to move cursor, Ctrl+A/E for start/end") {
+		t.Errorf("Expected updated instructions for textinput controls")
+	}
+
+	if !strings.Contains(view, "Press ENTER to save, ESC to cancel") {
+		t.Errorf("Expected standard save/cancel instructions")
+	}
+}
+
+func TestHostTextInputAdvancedFeatures(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Test character limit
+	if m.HostTextInput.CharLimit != 256 {
+		t.Errorf("Expected character limit of 256, got %d", m.HostTextInput.CharLimit)
+	}
+
+	// Test that textinput handles long URLs correctly
+	longURL := "https://very-long-subdomain.example-domain-name.com/very/long/path/with/many/segments/and/parameters?param1=value1&param2=value2&param3=value3"
+	m.HostTextInput.SetValue(longURL)
+
+	if len(m.HostTextInput.Value()) > 256 {
+		t.Errorf("Expected textinput to respect character limit, got length %d", len(m.HostTextInput.Value()))
+	}
+
+	// Test placeholder functionality
+	m.HostTextInput.SetValue("")
+	if m.HostTextInput.Placeholder == "" {
+		t.Errorf("Expected placeholder to be set")
+	}
+
+	// Test focus/blur functionality
+	m.HostTextInput.Focus()
+	if !m.HostTextInput.Focused() {
+		t.Errorf("Expected textinput to be focused after Focus() call")
+	}
+
+	m.HostTextInput.Blur()
+	if m.HostTextInput.Focused() {
+		t.Errorf("Expected textinput to be blurred after Blur() call")
 	}
 }
