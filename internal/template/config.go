@@ -21,12 +21,12 @@ func (c *ConfigManager) getConfigPath() (string, error) {
 		return "", err
 	}
 	configPath := filepath.Join(homeDir, ".silverfin", "config.json")
-	
+
 	// Check if file exists, if not use fixture
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return "fixtures/silverfin/config.json", nil
 	}
-	
+
 	return configPath, nil
 }
 
@@ -186,6 +186,32 @@ func (c *ConfigManager) SetHost(host string) error {
 
 	// Write back to file
 	newData, err := json.MarshalIndent(rawConfig, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configPath, newData, 0644)
+}
+
+func (c *ConfigManager) UpdateReconciliationType(templatePath, reconciliationType string) error {
+	configPath := filepath.Join(templatePath, "config.json")
+
+	// Read existing config
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return err
+	}
+
+	// Update the reconciliation_type
+	config["reconciliation_type"] = reconciliationType
+
+	// Write back to file
+	newData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
 	}

@@ -163,14 +163,20 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 	if len(template.Config) == 0 {
 		details = append(details, "  (empty)")
 	} else {
-		configJSON, _ := json.MarshalIndent(template.Config, "  ", "  ")
-		configLines := strings.Split(string(configJSON), "\n")
-		for _, line := range configLines {
-			configLine := "  " + line
-			if maxWidth > 0 {
-				configLine = r.TruncateText(configLine, maxWidth)
+		// Show structured config fields for reconciliation_texts
+		if template.Category == "reconciliation_texts" {
+			details = append(details, r.renderReconciliationTextConfig(template, m, maxWidth))
+		} else {
+			// Fallback to JSON display for other categories
+			configJSON, _ := json.MarshalIndent(template.Config, "  ", "  ")
+			configLines := strings.Split(string(configJSON), "\n")
+			for _, line := range configLines {
+				configLine := "  " + line
+				if maxWidth > 0 {
+					configLine = r.TruncateText(configLine, maxWidth)
+				}
+				details = append(details, configLine)
 			}
-			details = append(details, configLine)
 		}
 	}
 
@@ -190,6 +196,75 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 	}
 
 	return strings.Join(details, "\n")
+}
+
+func (r *Renderer) renderReconciliationTextConfig(template models.Template, m *models.Model, maxWidth int) string {
+	var lines []string
+
+	// Only show reconciliation_type field for now
+	if reconciliationType, exists := template.Config["reconciliation_type"]; exists {
+		line := fmt.Sprintf("  reconciliation_type: %v", reconciliationType)
+		if maxWidth > 0 {
+			line = r.TruncateText(line, maxWidth)
+		}
+
+		// Highlight if this field is selected and we're in Details section
+		if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == 0 {
+			line = models.SelectedItemStyle.Render(line)
+		}
+
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (r *Renderer) ReconciliationTypePopupView(m *models.Model) string {
+	// Build popup content
+	var content strings.Builder
+	content.WriteString("Select Reconciliation Type\n\n")
+
+	// Reconciliation type options
+	reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
+	for i, rType := range reconciliationTypes {
+		if i == m.SelectedReconciliationType {
+			// Highlight selected option
+			content.WriteString(models.SelectedItemStyle.Render(fmt.Sprintf("> %s", rType)))
+		} else {
+			content.WriteString(fmt.Sprintf("  %s", rType))
+		}
+		content.WriteString("\n")
+	}
+
+	content.WriteString("\nUse ↑/↓ or k/j to navigate")
+	content.WriteString("\nPress ENTER to select, ESC to cancel")
+
+	// Calculate popup dimensions
+	popupWidth := 50
+	popupHeight := 10
+
+	// Center the popup
+	leftMargin := max(0, (m.Width-popupWidth)/2)
+	topMargin := max(0, (m.Height-popupHeight)/2)
+
+	popupBox := models.ActiveBorderStyle.
+		Width(popupWidth).
+		Height(popupHeight).
+		Padding(1).
+		Render(content.String())
+
+	// Add top margin using newlines
+	centeredPopup := strings.Repeat("\n", topMargin) + popupBox
+
+	// Add left margin using spaces
+	lines := strings.Split(centeredPopup, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = strings.Repeat(" ", leftMargin) + line
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func (r *Renderer) OutputView(m *models.Model) string {

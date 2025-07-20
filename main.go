@@ -196,6 +196,48 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Handle reconciliation type popup
+		if a.model.ShowReconciliationTypePopup {
+			switch msg.String() {
+			case "esc":
+				a.model.ShowReconciliationTypePopup = false
+				a.model.SelectedReconciliationType = 0
+				a.model.Output = "Reconciliation type edit cancelled"
+				return a, nil
+			case "up", "k":
+				a.model.SelectedReconciliationType = (a.model.SelectedReconciliationType - 1 + 3) % 3
+				return a, nil
+			case "down", "j":
+				a.model.SelectedReconciliationType = (a.model.SelectedReconciliationType + 1) % 3
+				return a, nil
+			case "enter":
+				// Get the selected reconciliation type
+				reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
+				selectedType := reconciliationTypes[a.model.SelectedReconciliationType]
+
+				// Get the current template
+				if len(a.model.FilteredTemplates) > 0 && a.model.SelectedTemplate < len(a.model.FilteredTemplates) {
+					actualIndex := a.model.FilteredTemplates[a.model.SelectedTemplate]
+					template := a.model.Templates[actualIndex]
+
+					// Update the config and save to file
+					err := a.configManager.UpdateReconciliationType(template.Path, selectedType)
+					if err != nil {
+						a.model.Output = fmt.Sprintf("Error updating reconciliation type: %v", err)
+					} else {
+						// Update the in-memory template config
+						a.model.Templates[actualIndex].Config["reconciliation_type"] = selectedType
+						a.model.Output = fmt.Sprintf("Reconciliation type set to: %s", selectedType)
+					}
+				}
+
+				a.model.ShowReconciliationTypePopup = false
+				a.model.SelectedReconciliationType = 0
+				return a, nil
+			}
+			return a, nil
+		}
+
 		// Handle special cases first
 		if msg.Alt {
 			return a, nil // Skip alt combinations
@@ -280,11 +322,19 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 
 		case "up", "k":
-			a.navHandler.HandleTemplateNavigation(a.model, "up")
+			if a.model.CurrentSection == models.TemplatesSection {
+				a.navHandler.HandleTemplateNavigation(a.model, "up")
+			} else if a.model.CurrentSection == models.DetailsSection {
+				a.navHandler.HandleDetailsNavigation(a.model, "up")
+			}
 			return a, nil
 
 		case "down", "j":
-			a.navHandler.HandleTemplateNavigation(a.model, "down")
+			if a.model.CurrentSection == models.TemplatesSection {
+				a.navHandler.HandleTemplateNavigation(a.model, "down")
+			} else if a.model.CurrentSection == models.DetailsSection {
+				a.navHandler.HandleDetailsNavigation(a.model, "down")
+			}
 			return a, nil
 
 		case "left", "h":
@@ -348,6 +398,30 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.model.HostTextInput.Focus()
 				a.model.HostTextInput.CursorEnd()
 				a.model.Output = "Edit host URL"
+			} else if a.model.CurrentSection == models.DetailsSection {
+				// Handle enter in Details section for config field editing
+				if len(a.model.FilteredTemplates) > 0 && a.model.SelectedTemplate < len(a.model.FilteredTemplates) {
+					actualIndex := a.model.FilteredTemplates[a.model.SelectedTemplate]
+					template := a.model.Templates[actualIndex]
+
+					// Only handle reconciliation_type for reconciliation_texts
+					if template.Category == "reconciliation_texts" && a.model.SelectedDetailField == 0 {
+						if _, exists := template.Config["reconciliation_type"]; exists {
+							a.model.ShowReconciliationTypePopup = true
+							a.model.SelectedReconciliationType = 0
+							// Set current selection based on current value
+							currentValue := template.Config["reconciliation_type"]
+							reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
+							for i, rType := range reconciliationTypes {
+								if currentValue == rType {
+									a.model.SelectedReconciliationType = i
+									break
+								}
+							}
+							a.model.Output = "Select reconciliation type"
+						}
+					}
+				}
 			} else if a.model.CurrentSection == models.TemplatesSection && len(a.model.SelectedTemplates) > 0 {
 				a.model.ShowActionPopup = true
 				a.model.SelectedAction = 0
@@ -380,6 +454,10 @@ func (a *app) View() string {
 
 	if a.model.ShowHostPopup {
 		return a.uiRenderer.HostPopupView(a.model)
+	}
+
+	if a.model.ShowReconciliationTypePopup {
+		return a.uiRenderer.ReconciliationTypePopupView(a.model)
 	}
 
 	if a.model.Height < 10 {

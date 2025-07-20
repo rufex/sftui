@@ -36,27 +36,30 @@ type FirmOption struct {
 }
 
 type Model struct {
-	CurrentSection    Section
-	Templates         []Template
-	SelectedTemplate  int
-	TemplatesOffset   int
-	SelectedTemplates map[int]bool
-	SearchMode        bool
-	SearchQuery       string
-	FilteredTemplates []int
-	ShowActionPopup   bool
-	SelectedAction    int
-	ShowFirmPopup     bool
-	SelectedFirm      int
-	FirmOptions       []FirmOption
-	ShowHostPopup     bool
-	HostTextInput     textinput.Model
-	Firm              string
-	Host              string
-	ShowHelp          bool
-	Output            string
-	Width             int
-	Height            int
+	CurrentSection              Section
+	Templates                   []Template
+	SelectedTemplate            int
+	TemplatesOffset             int
+	SelectedTemplates           map[int]bool
+	SearchMode                  bool
+	SearchQuery                 string
+	FilteredTemplates           []int
+	ShowActionPopup             bool
+	SelectedAction              int
+	ShowFirmPopup               bool
+	SelectedFirm                int
+	FirmOptions                 []FirmOption
+	ShowHostPopup               bool
+	HostTextInput               textinput.Model
+	Firm                        string
+	Host                        string
+	ShowHelp                    bool
+	Output                      string
+	Width                       int
+	Height                      int
+	SelectedDetailField         int
+	ShowReconciliationTypePopup bool
+	SelectedReconciliationType  int
 }
 
 var (

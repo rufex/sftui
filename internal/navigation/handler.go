@@ -85,6 +85,39 @@ func (h *Handler) HandleTemplateNavigation(m *models.Model, direction string) {
 	}
 }
 
+func (h *Handler) HandleDetailsNavigation(m *models.Model, direction string) {
+	if m.CurrentSection != models.DetailsSection || len(m.FilteredTemplates) == 0 {
+		return
+	}
+
+	// Get actual template index from filtered list
+	actualIndex := m.FilteredTemplates[m.SelectedTemplate]
+	template := m.Templates[actualIndex]
+
+	// Count available config fields for navigation
+	fieldCount := h.GetConfigFieldCount(template)
+	if fieldCount == 0 {
+		return
+	}
+
+	switch direction {
+	case "up":
+		m.SelectedDetailField = (m.SelectedDetailField - 1 + fieldCount) % fieldCount
+	case "down":
+		m.SelectedDetailField = (m.SelectedDetailField + 1) % fieldCount
+	}
+}
+
+func (h *Handler) GetConfigFieldCount(template models.Template) int {
+	// For reconciliation_texts, we only show reconciliation_type field
+	if template.Category == "reconciliation_texts" {
+		if _, exists := template.Config["reconciliation_type"]; exists {
+			return 1
+		}
+	}
+	return 0
+}
+
 func (h *Handler) NextSection(m *models.Model) {
 	m.CurrentSection = models.Section((int(m.CurrentSection) + 1) % 5)
 }

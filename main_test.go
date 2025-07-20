@@ -914,3 +914,307 @@ func TestHostTextInputAdvancedFeatures(t *testing.T) {
 		t.Errorf("Expected textinput to be blurred after Blur() call")
 	}
 }
+
+func TestDetailsNavigation(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Ensure we have templates loaded
+	if len(m.Templates) == 0 {
+		t.Skip("No templates available for testing")
+	}
+
+	// Find a reconciliation_text template for testing
+	reconciliationIndex := -1
+	for i, template := range m.Templates {
+		if template.Category == "reconciliation_texts" {
+			reconciliationIndex = i
+			break
+		}
+	}
+
+	if reconciliationIndex == -1 {
+		t.Skip("No reconciliation_texts templates available for testing")
+	}
+
+	// Set current section to Details
+	m.CurrentSection = models.DetailsSection
+	m.SelectedTemplate = 0
+
+	// Update filtered templates to include our reconciliation template
+	m.FilteredTemplates = []int{reconciliationIndex}
+
+	// Test initial state
+	if m.SelectedDetailField != 0 {
+		t.Errorf("Expected initial SelectedDetailField to be 0, got %d", m.SelectedDetailField)
+	}
+
+	// Test that navigation works
+	navHandler := navigation.NewHandler()
+	navHandler.HandleDetailsNavigation(m, "down")
+	// Since there's only one field, it should wrap to 0
+	if m.SelectedDetailField != 0 {
+		t.Errorf("Expected SelectedDetailField to remain 0 after down navigation, got %d", m.SelectedDetailField)
+	}
+
+	navHandler.HandleDetailsNavigation(m, "up")
+	if m.SelectedDetailField != 0 {
+		t.Errorf("Expected SelectedDetailField to remain 0 after up navigation, got %d", m.SelectedDetailField)
+	}
+}
+
+func TestDetailsNavigationWithoutReconciliationType(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Create a template without reconciliation_type
+	m.Templates = []models.Template{
+		{
+			Name:     "Test Template",
+			Category: "account_templates",
+			Config:   map[string]interface{}{},
+		},
+	}
+	m.FilteredTemplates = []int{0}
+	m.CurrentSection = models.DetailsSection
+
+	navHandler := navigation.NewHandler()
+
+	// Should not navigate if no config fields available
+	initialField := m.SelectedDetailField
+	navHandler.HandleDetailsNavigation(m, "down")
+	if m.SelectedDetailField != initialField {
+		t.Errorf("Expected SelectedDetailField to remain unchanged for template without config fields")
+	}
+}
+
+func TestReconciliationTypePopupTrigger(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Find a reconciliation_text template
+	reconciliationIndex := -1
+	for i, template := range m.Templates {
+		if template.Category == "reconciliation_texts" {
+			reconciliationIndex = i
+			break
+		}
+	}
+
+	if reconciliationIndex == -1 {
+		t.Skip("No reconciliation_texts templates available for testing")
+	}
+
+	// Setup for testing Enter key in Details section
+	m.CurrentSection = models.DetailsSection
+	m.FilteredTemplates = []int{reconciliationIndex}
+	m.SelectedTemplate = 0
+	m.SelectedDetailField = 0
+
+	// Simulate Enter key press
+	keyMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	_, _ = app.Update(keyMsg)
+
+	// Check that popup was triggered
+	if !m.ShowReconciliationTypePopup {
+		t.Errorf("Expected ShowReconciliationTypePopup to be true after Enter in Details section")
+	}
+
+	if m.SelectedReconciliationType < 0 || m.SelectedReconciliationType > 2 {
+		t.Errorf("Expected SelectedReconciliationType to be 0-2, got %d", m.SelectedReconciliationType)
+	}
+}
+
+func TestReconciliationTypePopupNavigation(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Setup popup state
+	m.ShowReconciliationTypePopup = true
+	m.SelectedReconciliationType = 0
+
+	// Test down navigation
+	keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
+	_, _ = app.Update(keyMsg)
+	if m.SelectedReconciliationType != 1 {
+		t.Errorf("Expected SelectedReconciliationType to be 1 after down navigation, got %d", m.SelectedReconciliationType)
+	}
+
+	// Test up navigation
+	keyMsg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
+	_, _ = app.Update(keyMsg)
+	if m.SelectedReconciliationType != 0 {
+		t.Errorf("Expected SelectedReconciliationType to be 0 after up navigation, got %d", m.SelectedReconciliationType)
+	}
+
+	// Test wrap around (down from 2 should go to 0)
+	m.SelectedReconciliationType = 2
+	keyMsg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
+	_, _ = app.Update(keyMsg)
+	if m.SelectedReconciliationType != 0 {
+		t.Errorf("Expected SelectedReconciliationType to wrap to 0, got %d", m.SelectedReconciliationType)
+	}
+
+	// Test wrap around (up from 0 should go to 2)
+	m.SelectedReconciliationType = 0
+	keyMsg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
+	_, _ = app.Update(keyMsg)
+	if m.SelectedReconciliationType != 2 {
+		t.Errorf("Expected SelectedReconciliationType to wrap to 2, got %d", m.SelectedReconciliationType)
+	}
+}
+
+func TestReconciliationTypePopupCancel(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Setup popup state
+	m.ShowReconciliationTypePopup = true
+	m.SelectedReconciliationType = 1
+
+	// Test escape cancellation
+	keyMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	_, _ = app.Update(keyMsg)
+
+	if m.ShowReconciliationTypePopup {
+		t.Errorf("Expected ShowReconciliationTypePopup to be false after escape")
+	}
+
+	if m.SelectedReconciliationType != 0 {
+		t.Errorf("Expected SelectedReconciliationType to reset to 0 after escape, got %d", m.SelectedReconciliationType)
+	}
+
+	if !strings.Contains(m.Output, "cancelled") {
+		t.Errorf("Expected output to contain 'cancelled', got: %s", m.Output)
+	}
+}
+
+func TestDetailsHighlighting(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Find a reconciliation_text template
+	reconciliationIndex := -1
+	for i, template := range m.Templates {
+		if template.Category == "reconciliation_texts" {
+			reconciliationIndex = i
+			break
+		}
+	}
+
+	if reconciliationIndex == -1 {
+		t.Skip("No reconciliation_texts templates available for testing")
+	}
+
+	// Setup for testing highlighting
+	m.CurrentSection = models.DetailsSection
+	m.FilteredTemplates = []int{reconciliationIndex}
+	m.SelectedTemplate = 0
+	m.SelectedDetailField = 0
+
+	// Render details view
+	renderer := ui.NewRenderer()
+	view := renderer.DetailsViewWithHeightAndWidth(m, 10, 50)
+
+	// Should contain reconciliation_type field
+	if !strings.Contains(view, "reconciliation_type") {
+		t.Errorf("Expected details view to contain reconciliation_type field")
+	}
+
+	// Test that highlighting is not applied when not in Details section
+	m.CurrentSection = models.TemplatesSection
+	viewNoHighlight := renderer.DetailsViewWithHeightAndWidth(m, 10, 50)
+
+	// Both views should contain the field, but highlighting should be different
+	if !strings.Contains(viewNoHighlight, "reconciliation_type") {
+		t.Errorf("Expected details view to contain reconciliation_type field even when not active")
+	}
+}
+
+func TestUpDownNavigationInDetailsSection(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Find a reconciliation_text template
+	reconciliationIndex := -1
+	for i, template := range m.Templates {
+		if template.Category == "reconciliation_texts" {
+			reconciliationIndex = i
+			break
+		}
+	}
+
+	if reconciliationIndex == -1 {
+		t.Skip("No reconciliation_texts templates available for testing")
+	}
+
+	// Setup
+	m.CurrentSection = models.DetailsSection
+	m.FilteredTemplates = []int{reconciliationIndex}
+	m.SelectedTemplate = 0
+	m.SelectedDetailField = 0
+
+	// Test that up/down keys work in Details section
+	initialField := m.SelectedDetailField
+
+	// Simulate down key
+	keyMsg := tea.KeyMsg{Type: tea.KeyDown}
+	_, _ = app.Update(keyMsg)
+
+	// With only one field, should remain the same
+	if m.SelectedDetailField != initialField {
+		t.Errorf("Expected SelectedDetailField to remain %d with single field, got %d", initialField, m.SelectedDetailField)
+	}
+
+	// Simulate up key
+	keyMsg = tea.KeyMsg{Type: tea.KeyUp}
+	_, _ = app.Update(keyMsg)
+
+	if m.SelectedDetailField != initialField {
+		t.Errorf("Expected SelectedDetailField to remain %d with single field, got %d", initialField, m.SelectedDetailField)
+	}
+}
+
+func TestGetConfigFieldCount(t *testing.T) {
+	navHandler := navigation.NewHandler()
+
+	tests := []struct {
+		name          string
+		template      models.Template
+		expectedCount int
+	}{
+		{
+			name: "reconciliation_texts with reconciliation_type",
+			template: models.Template{
+				Category: "reconciliation_texts",
+				Config:   map[string]interface{}{"reconciliation_type": "can_be_reconciled_without_data"},
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "reconciliation_texts without reconciliation_type",
+			template: models.Template{
+				Category: "reconciliation_texts",
+				Config:   map[string]interface{}{"other_field": "value"},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "account_templates",
+			template: models.Template{
+				Category: "account_templates",
+				Config:   map[string]interface{}{"some_field": "value"},
+			},
+			expectedCount: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			count := navHandler.GetConfigFieldCount(test.template)
+			if count != test.expectedCount {
+				t.Errorf("Expected count %d, got %d", test.expectedCount, count)
+			}
+		})
+	}
+}
