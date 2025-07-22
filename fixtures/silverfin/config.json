@@ -1,0 +1,13 @@
+{
+  "defaultFirmIDs": {
+    "market-repo": "1234",
+    "another-repo": "2312"
+  },
+  "host": "https://test-environment.silverfin.com",
+  "1234": {
+    "firmName": "Market Repository Base Firm"
+  },
+  "2312": {
+    "firmName": "Secondary Firm"
+  }
+}
