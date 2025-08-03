@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -164,25 +163,12 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 	if len(template.Config) == 0 {
 		details = append(details, "  (empty)")
 	} else {
-		// Show structured config fields (only reconciliation_type for reconciliation_texts)
-		if template.Category == "reconciliation_texts" {
-			reconciliationConfig := r.renderReconciliationConfig(template, m, maxWidth)
-			if reconciliationConfig != "" {
-				// Split the reconciliation config into individual lines
-				reconciliationLines := strings.Split(reconciliationConfig, "\n")
-				details = append(details, reconciliationLines...)
-			}
-		} else {
-			// Fallback to JSON display for other categories
-			configJSON, _ := json.MarshalIndent(template.Config, "  ", "  ")
-			configLines := strings.Split(string(configJSON), "\n")
-			for _, line := range configLines {
-				configLine := "  " + line
-				if maxWidth > 0 {
-					configLine = r.TruncateText(configLine, maxWidth)
-				}
-				details = append(details, configLine)
-			}
+		// Show structured config fields for all template types
+		structuredConfig := r.renderStructuredConfig(template, m, maxWidth)
+		if structuredConfig != "" {
+			// Split the structured config into individual lines
+			configLines := strings.Split(structuredConfig, "\n")
+			details = append(details, configLines...)
 		}
 	}
 
@@ -226,25 +212,73 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 	return strings.Join(details, "\n")
 }
 
-func (r *Renderer) renderReconciliationConfig(template models.Template, m *models.Model, maxWidth int) string {
+func (r *Renderer) renderStructuredConfig(template models.Template, m *models.Model, maxWidth int) string {
 	var lines []string
+	fieldIndex := 0
 
-	// Show reconciliation_type field for reconciliation_texts
-	if reconciliationType, exists := template.Config["reconciliation_type"]; exists {
-		line := fmt.Sprintf("  reconciliation_type: %v", reconciliationType)
-		if maxWidth > 0 {
-			line = r.TruncateText(line, maxWidth)
+	// Define the fixed keys to show for all template types
+	configKeys := []string{
+		"public",
+		"reconciliation_type",
+		"virtual_account_number",
+		"allow_duplicate_reconciliation",
+		"is_active",
+		"use_full_width",
+		"downloadable_as_docx",
+		"encoding",
+		"published",
+		"hide_code",
+		"externally_managed",
+	}
+
+	// Show each config key if it exists
+	for _, key := range configKeys {
+		if value, exists := template.Config[key]; exists {
+			line := fmt.Sprintf("  %s: %v", key, value)
+			if maxWidth > 0 {
+				line = r.TruncateText(line, maxWidth)
+			}
+
+			// Highlight if this field is selected and we're in Details section
+			if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == fieldIndex {
+				line = models.SelectedItemStyle.Render(line)
+			}
+
+			lines = append(lines, line)
+			fieldIndex++
 		}
-
-		// Highlight if this field is selected and we're in Details section
-		if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == 0 {
-			line = models.SelectedItemStyle.Render(line)
-		}
-
-		lines = append(lines, line)
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// GetConfigFieldCount returns the number of config fields that will be displayed
+func (r *Renderer) GetConfigFieldCount(template models.Template) int {
+	count := 0
+
+	// Define the fixed keys to show for all template types (same as in renderStructuredConfig)
+	configKeys := []string{
+		"public",
+		"reconciliation_type",
+		"virtual_account_number",
+		"allow_duplicate_reconciliation",
+		"is_active",
+		"use_full_width",
+		"downloadable_as_docx",
+		"encoding",
+		"published",
+		"hide_code",
+		"externally_managed",
+	}
+
+	// Count how many of these keys exist in the template config
+	for _, key := range configKeys {
+		if _, exists := template.Config[key]; exists {
+			count++
+		}
+	}
+
+	return count
 }
 
 func (r *Renderer) renderTextPartsSection(template models.Template, m *models.Model, maxWidth int) string {
@@ -284,12 +318,7 @@ func (r *Renderer) renderTextPartsSection(template models.Template, m *models.Mo
 	}
 
 	// Calculate field index - config fields come first
-	configFieldCount := 0
-	if template.Category == "reconciliation_texts" {
-		if _, exists := template.Config["reconciliation_type"]; exists {
-			configFieldCount = 1
-		}
-	}
+	configFieldCount := r.GetConfigFieldCount(template)
 
 	// Render each text part (only show name)
 	for i, part := range partsList {
@@ -329,12 +358,7 @@ func (r *Renderer) renderSharedPartsSection(template models.Template, m *models.
 	lines = append(lines, "Shared Parts:")
 
 	// Calculate field index - config fields and text parts come first
-	configFieldCount := 0
-	if template.Category == "reconciliation_texts" {
-		if _, exists := template.Config["reconciliation_type"]; exists {
-			configFieldCount = 1
-		}
-	}
+	configFieldCount := r.GetConfigFieldCount(template)
 
 	textPartsCount := 0
 	if textPartsInterface, exists := template.Config["text_parts"]; exists {

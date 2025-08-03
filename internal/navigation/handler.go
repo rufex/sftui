@@ -94,13 +94,8 @@ func (h *Handler) HandleDetailsNavigation(m *models.Model, direction string) {
 	actualIndex := m.FilteredTemplates[m.SelectedTemplate]
 	template := m.Templates[actualIndex]
 
-	// Count config fields (currently only reconciliation_type for reconciliation_texts)
-	configFieldCount := 0
-	if template.Category == "reconciliation_texts" {
-		if _, exists := template.Config["reconciliation_type"]; exists {
-			configFieldCount = 1
-		}
-	}
+	// Count config fields (fixed keys for all template types)
+	configFieldCount := h.GetActualConfigFieldCount(template)
 
 	// Count text parts
 	textPartsCount := h.GetTextPartsCount(template)
@@ -130,15 +125,36 @@ func (h *Handler) HandleDetailsNavigation(m *models.Model, direction string) {
 	}
 }
 
-func (h *Handler) GetConfigFieldCount(template models.Template, sharedPartsUsage map[string][]string) int {
+func (h *Handler) GetActualConfigFieldCount(template models.Template) int {
 	count := 0
 
-	// For reconciliation_texts, we show reconciliation_type field
-	if template.Category == "reconciliation_texts" {
-		if _, exists := template.Config["reconciliation_type"]; exists {
+	// Define the fixed keys to show for all template types (same as in renderer)
+	configKeys := []string{
+		"public",
+		"reconciliation_type",
+		"virtual_account_number",
+		"allow_duplicate_reconciliation",
+		"is_active",
+		"use_full_width",
+		"downloadable_as_docx",
+		"encoding",
+		"published",
+		"hide_code",
+		"externally_managed",
+	}
+
+	// Count how many of these keys exist in the template config
+	for _, key := range configKeys {
+		if _, exists := template.Config[key]; exists {
 			count++
 		}
 	}
+
+	return count
+}
+
+func (h *Handler) GetConfigFieldCount(template models.Template, sharedPartsUsage map[string][]string) int {
+	count := h.GetActualConfigFieldCount(template)
 
 	// Add text parts count (for templates that support them, excluding shared_parts)
 	if template.Category != "shared_parts" {

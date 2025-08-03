@@ -1227,6 +1227,119 @@ func TestUpDownNavigationInDetailsSection(t *testing.T) {
 	}
 }
 
+func TestDetailsNavigationMultipleHighlighting(t *testing.T) {
+	app := newApp()
+	m := app.initialModel()
+
+	// Create a simple test template with just a few known fields
+	testTemplate := models.Template{
+		Name:     "test_template",
+		Category: "reconciliation_texts",
+		Config: map[string]interface{}{
+			"reconciliation_type": "can_be_reconciled_without_data",
+			"public":              false,
+			"text_parts": map[string]interface{}{
+				"part_1": "text_parts/part_1.liquid",
+			},
+		},
+	}
+
+	m.Templates = []models.Template{testTemplate}
+	m.FilteredTemplates = []int{0}
+	m.SelectedTemplate = 0
+	m.CurrentSection = models.DetailsSection
+
+	renderer := ui.NewRenderer()
+
+	// Test specific field indices to see which ones should highlight what
+	testCases := []struct {
+		fieldIndex   int
+		description  string
+		shouldHighlight string
+	}{
+		{0, "First config field", "reconciliation_type"},
+		{1, "Second config field", "public"},
+		{2, "First text part", "part_1"},
+	}
+
+	for _, tc := range testCases {
+		m.SelectedDetailField = tc.fieldIndex
+		detailsContent := renderer.DetailsView(m)
+		
+		// Debug: print what's being highlighted
+		t.Logf("Field index %d (%s):", tc.fieldIndex, tc.description)
+		t.Logf("Content contains reconciliation_type: %v", strings.Contains(detailsContent, "reconciliation_type"))
+		t.Logf("Content contains public: %v", strings.Contains(detailsContent, "public"))
+		t.Logf("Content contains part_1: %v", strings.Contains(detailsContent, "part_1"))
+		
+		// Check which items are highlighted
+		reconciliationHighlighted := strings.Contains(detailsContent, models.SelectedItemStyle.Render("  reconciliation_type: can_be_reconciled_without_data"))
+		publicHighlighted := strings.Contains(detailsContent, models.SelectedItemStyle.Render("  public: false"))
+		part1Highlighted := strings.Contains(detailsContent, models.SelectedItemStyle.Render("  part_1"))
+		
+		t.Logf("reconciliation_type highlighted: %v", reconciliationHighlighted)
+		t.Logf("public highlighted: %v", publicHighlighted)
+		t.Logf("part_1 highlighted: %v", part1Highlighted)
+		
+		// Count total highlighted items
+		highlightCount := 0
+		if reconciliationHighlighted { highlightCount++ }
+		if publicHighlighted { highlightCount++ }
+		if part1Highlighted { highlightCount++ }
+		
+		if highlightCount > 1 {
+			t.Errorf("Field index %d: Expected 1 highlighted field, got %d", tc.fieldIndex, highlightCount)
+		}
+	}
+}
+
+func TestDetailsFieldIndexCalculation(t *testing.T) {
+	testTemplate := models.Template{
+		Name:     "test_template",
+		Category: "reconciliation_texts",
+		Config: map[string]interface{}{
+			"reconciliation_type": "can_be_reconciled_without_data",
+			"public":              false,
+			"text_parts": map[string]interface{}{
+				"part_1": "text_parts/part_1.liquid",
+			},
+		},
+	}
+
+	renderer := ui.NewRenderer()
+	navHandler := navigation.NewHandler()
+
+	// Test field counting
+	rendererConfigCount := renderer.GetConfigFieldCount(testTemplate)
+	navConfigCount := navHandler.GetActualConfigFieldCount(testTemplate)
+	
+	t.Logf("Renderer config count: %d", rendererConfigCount)
+	t.Logf("Navigation config count: %d", navConfigCount)
+	
+	if rendererConfigCount != navConfigCount {
+		t.Errorf("Config count mismatch: renderer=%d, navigation=%d", rendererConfigCount, navConfigCount)
+	}
+	
+	// Expected: 2 config fields (reconciliation_type, public) + 1 text part
+	expectedConfigFields := 2
+	expectedTextParts := 1
+	expectedTotal := expectedConfigFields + expectedTextParts
+	
+	if rendererConfigCount != expectedConfigFields {
+		t.Errorf("Expected %d config fields, got %d", expectedConfigFields, rendererConfigCount)
+	}
+	
+	textPartsCount := navHandler.GetTextPartsCount(testTemplate)
+	if textPartsCount != expectedTextParts {
+		t.Errorf("Expected %d text parts, got %d", expectedTextParts, textPartsCount)
+	}
+	
+	totalFields := navHandler.GetConfigFieldCount(testTemplate, map[string][]string{})
+	if totalFields != expectedTotal {
+		t.Errorf("Expected %d total fields, got %d", expectedTotal, totalFields)
+	}
+}
+
 func TestGetConfigFieldCount(t *testing.T) {
 	navHandler := navigation.NewHandler()
 

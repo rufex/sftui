@@ -462,31 +462,27 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					actualIndex := a.model.FilteredTemplates[a.model.SelectedTemplate]
 					template := a.model.Templates[actualIndex]
 
-					// Count config fields to determine if we're on text parts
-					configFieldCount := 0
-					if template.Category == "reconciliation_texts" {
-						if _, exists := template.Config["reconciliation_type"]; exists {
-							configFieldCount = 1
-						}
-					}
+					// Get config field count using the same logic as renderer and navigation
+					configFieldCount := a.getConfigFieldCount(template)
 
 					if a.model.SelectedDetailField < configFieldCount {
-						// We're on a config field
-						if template.Category == "reconciliation_texts" && a.model.SelectedDetailField == 0 {
-							if _, exists := template.Config["reconciliation_type"]; exists {
-								a.model.ShowReconciliationTypePopup = true
-								a.model.SelectedReconciliationType = 0
-								// Set current selection based on current value
-								currentValue := template.Config["reconciliation_type"]
-								reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
-								for i, rType := range reconciliationTypes {
-									if currentValue == rType {
-										a.model.SelectedReconciliationType = i
-										break
-									}
+						// We're on a config field - determine which specific field
+						selectedConfigField := a.getSelectedConfigField(template, a.model.SelectedDetailField)
+						
+						// Only show reconciliation_type popup if that specific field is selected
+						if selectedConfigField == "reconciliation_type" && template.Category == "reconciliation_texts" {
+							a.model.ShowReconciliationTypePopup = true
+							a.model.SelectedReconciliationType = 0
+							// Set current selection based on current value
+							currentValue := template.Config["reconciliation_type"]
+							reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
+							for i, rType := range reconciliationTypes {
+								if currentValue == rType {
+									a.model.SelectedReconciliationType = i
+									break
 								}
-								a.model.Output = "Select reconciliation type"
 							}
+							a.model.Output = "Select reconciliation type"
 						}
 					} else if template.Category != "shared_parts" {
 						// We're on a text part (only for templates that support them)
@@ -653,6 +649,67 @@ func (a *app) View() string {
 	} else {
 		return lipgloss.JoinVertical(lipgloss.Left, topRow, mainRow, outputBox, statusBar)
 	}
+}
+
+// getConfigFieldCount returns the number of config fields that will be displayed for a template
+func (a *app) getConfigFieldCount(template models.Template) int {
+	count := 0
+
+	// Define the fixed keys to show for all template types (same as in renderer)
+	configKeys := []string{
+		"public",
+		"reconciliation_type",
+		"virtual_account_number",
+		"allow_duplicate_reconciliation",
+		"is_active",
+		"use_full_width",
+		"downloadable_as_docx",
+		"encoding",
+		"published",
+		"hide_code",
+		"externally_managed",
+	}
+
+	// Count how many of these keys exist in the template config
+	for _, key := range configKeys {
+		if _, exists := template.Config[key]; exists {
+			count++
+		}
+	}
+
+	return count
+}
+
+// getSelectedConfigField returns the config field name at the given index
+func (a *app) getSelectedConfigField(template models.Template, fieldIndex int) string {
+	currentIndex := 0
+
+	// Define the fixed keys to show for all template types (same as in renderer)
+	configKeys := []string{
+		"public",
+		"reconciliation_type",
+		"virtual_account_number",
+		"allow_duplicate_reconciliation",
+		"is_active",
+		"use_full_width",
+		"downloadable_as_docx",
+		"encoding",
+		"published",
+		"hide_code",
+		"externally_managed",
+	}
+
+	// Find which config field corresponds to the given index
+	for _, key := range configKeys {
+		if _, exists := template.Config[key]; exists {
+			if currentIndex == fieldIndex {
+				return key
+			}
+			currentIndex++
+		}
+	}
+
+	return "" // Field index out of range
 }
 
 // buildSharedPartsMapping builds a mapping of which shared parts each template uses
