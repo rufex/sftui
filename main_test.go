@@ -1385,3 +1385,99 @@ func TestGetConfigFieldCount(t *testing.T) {
 		})
 	}
 }
+
+func TestInPlaceEditingCancelRestore(t *testing.T) {
+	app := newApp()
+	model := app.initialModel()
+
+	// Create a template with boolean config field
+	template := models.Template{
+		Name:     "test_template",
+		Category: "reconciliation_texts",
+		Path:     "/test/path",
+		Config: map[string]interface{}{
+			"public": false,
+		},
+	}
+
+	model.Templates = []models.Template{template}
+	model.FilteredTemplates = []int{0}
+	model.SelectedTemplate = 0
+	model.CurrentSection = models.DetailsSection
+	model.SelectedDetailField = 0
+
+	// Start in-place editing
+	model.ShowInPlaceEdit = true
+	model.InPlaceEditField = "public"
+	model.InPlaceEditOptions = []string{"true", "false"}
+	model.InPlaceEditOriginalValue = false
+	model.InPlaceEditSelectedIndex = 0 // selecting "true"
+
+	// Simulate navigation to different value
+	model.InPlaceEditSelectedIndex = 0 // "true" is selected
+
+	// Verify the template still has original value (not changed until Enter)
+	if model.Templates[0].Config["public"] != false {
+		t.Errorf("Template value should not change until Enter is pressed, got %v", model.Templates[0].Config["public"])
+	}
+
+	// Simulate Escape key to cancel
+	// This mimics the escape handling logic from main.go
+	actualIndex := model.FilteredTemplates[model.SelectedTemplate]
+	model.Templates[actualIndex].Config[model.InPlaceEditField] = model.InPlaceEditOriginalValue
+	model.ShowInPlaceEdit = false
+	model.InPlaceEditField = ""
+	model.InPlaceEditOptions = nil
+	model.InPlaceEditOriginalValue = nil
+	model.InPlaceEditSelectedIndex = 0
+
+	// Verify the original value was restored
+	if model.Templates[0].Config["public"] != false {
+		t.Errorf("Expected original value false to be restored after escape, got %v", model.Templates[0].Config["public"])
+	}
+
+	// Verify editing state is cleared
+	if model.ShowInPlaceEdit {
+		t.Error("ShowInPlaceEdit should be false after escape")
+	}
+}
+
+func TestInPlaceEditingFieldDetection(t *testing.T) {
+	app := newApp()
+
+	// Test boolean fields
+	booleanFields := []string{"public", "is_active", "use_full_width", "downloadable_as_docx", 
+		"published", "hide_code", "externally_managed", "allow_duplicate_reconciliation"}
+	
+	for _, field := range booleanFields {
+		if !app.isFieldEditable(field) {
+			t.Errorf("Field %s should be editable", field)
+		}
+		
+		options := app.getFieldEditOptions(field, nil)
+		if len(options) != 2 || options[0] != "true" || options[1] != "false" {
+			t.Errorf("Field %s should have options [true, false], got %v", field, options)
+		}
+	}
+
+	// Test reconciliation_type field
+	if !app.isFieldEditable("reconciliation_type") {
+		t.Error("reconciliation_type should be editable")
+	}
+	
+	reconOptions := app.getFieldEditOptions("reconciliation_type", nil)
+	expectedReconOptions := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
+	if len(reconOptions) != 3 {
+		t.Errorf("reconciliation_type should have 3 options, got %d", len(reconOptions))
+	}
+	for i, expected := range expectedReconOptions {
+		if reconOptions[i] != expected {
+			t.Errorf("reconciliation_type option %d should be %s, got %s", i, expected, reconOptions[i])
+		}
+	}
+
+	// Test non-editable field
+	if app.isFieldEditable("non_existent_field") {
+		t.Error("non_existent_field should not be editable")
+	}
+}

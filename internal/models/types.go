@@ -66,6 +66,11 @@ type Model struct {
 	TextPartPathInput           textinput.Model
 	TextPartEditMode            string              // "name" or "path"
 	SharedPartsUsage            map[string][]string // maps template handle to shared part names
+	ShowInPlaceEdit             bool                // true when showing in-place edit for a config field
+	InPlaceEditField            string              // name of the field being edited in-place
+	InPlaceEditOptions          []string            // available options for the field
+	InPlaceEditOriginalValue    interface{}         // original value before editing (for revert on escape)
+	InPlaceEditSelectedIndex    int                 // currently selected option index
 }
 
 var (

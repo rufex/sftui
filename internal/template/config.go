@@ -218,3 +218,29 @@ func (c *ConfigManager) UpdateReconciliationType(templatePath, reconciliationTyp
 
 	return os.WriteFile(configPath, newData, 0644)
 }
+
+func (c *ConfigManager) UpdateConfigField(templatePath, fieldName string, value interface{}) error {
+	configPath := filepath.Join(templatePath, "config.json")
+
+	// Read existing config
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return err
+	}
+
+	// Update the field
+	config[fieldName] = value
+
+	// Write back to file
+	newData, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configPath, newData, 0644)
+}

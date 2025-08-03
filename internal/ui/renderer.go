@@ -241,6 +241,15 @@ func (r *Renderer) renderStructuredConfig(template models.Template, m *models.Mo
 
 			// Highlight if this field is selected and we're in Details section
 			if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == fieldIndex {
+				// If in-place editing is active for this field, show the currently selected option
+				if m.ShowInPlaceEdit && m.InPlaceEditField == key {
+					selectedValue := m.InPlaceEditOptions[m.InPlaceEditSelectedIndex]
+					// Show currently selected value with available options
+					line = fmt.Sprintf("  %s: %s [%s]", key, selectedValue, strings.Join(m.InPlaceEditOptions, "|"))
+					if maxWidth > 0 {
+						line = r.TruncateText(line, maxWidth)
+					}
+				}
 				line = models.SelectedItemStyle.Render(line)
 			}
 

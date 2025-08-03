@@ -296,6 +296,71 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Handle in-place edit
+		if a.model.ShowInPlaceEdit {
+			switch msg.String() {
+			case "esc":
+				// Revert to original value
+				if len(a.model.FilteredTemplates) > 0 && a.model.SelectedTemplate < len(a.model.FilteredTemplates) {
+					actualIndex := a.model.FilteredTemplates[a.model.SelectedTemplate]
+					a.model.Templates[actualIndex].Config[a.model.InPlaceEditField] = a.model.InPlaceEditOriginalValue
+				}
+				a.model.ShowInPlaceEdit = false
+				a.model.InPlaceEditField = ""
+				a.model.InPlaceEditOptions = nil
+				a.model.InPlaceEditOriginalValue = nil
+				a.model.InPlaceEditSelectedIndex = 0
+				a.model.Output = "Edit cancelled"
+				return a, nil
+			case "up", "k", "left", "h":
+				// Move to previous option (don't save yet)
+				if len(a.model.InPlaceEditOptions) > 0 {
+					a.model.InPlaceEditSelectedIndex = (a.model.InPlaceEditSelectedIndex - 1 + len(a.model.InPlaceEditOptions)) % len(a.model.InPlaceEditOptions)
+					selectedValue := a.model.InPlaceEditOptions[a.model.InPlaceEditSelectedIndex]
+					a.model.Output = fmt.Sprintf("%s: %s (↑/↓ to change, Enter to save, Esc to cancel)", a.model.InPlaceEditField, selectedValue)
+				}
+				return a, nil
+			case "down", "j", "right", "l":
+				// Move to next option (don't save yet)
+				if len(a.model.InPlaceEditOptions) > 0 {
+					a.model.InPlaceEditSelectedIndex = (a.model.InPlaceEditSelectedIndex + 1) % len(a.model.InPlaceEditOptions)
+					selectedValue := a.model.InPlaceEditOptions[a.model.InPlaceEditSelectedIndex]
+					a.model.Output = fmt.Sprintf("%s: %s (↑/↓ to change, Enter to save, Esc to cancel)", a.model.InPlaceEditField, selectedValue)
+				}
+				return a, nil
+			case "enter":
+				// Save the selected value
+				if len(a.model.FilteredTemplates) > 0 && a.model.SelectedTemplate < len(a.model.FilteredTemplates) && len(a.model.InPlaceEditOptions) > 0 {
+					actualIndex := a.model.FilteredTemplates[a.model.SelectedTemplate]
+					template := a.model.Templates[actualIndex]
+					newValue := a.model.InPlaceEditOptions[a.model.InPlaceEditSelectedIndex]
+					
+					// Update the config file and in-memory template
+					err := a.updateConfigField(template.Path, a.model.InPlaceEditField, newValue)
+					if err != nil {
+						a.model.Output = fmt.Sprintf("Error updating %s: %v", a.model.InPlaceEditField, err)
+					} else {
+						// Update in-memory template with proper type conversion
+						if a.model.InPlaceEditField == "reconciliation_type" || a.model.InPlaceEditField == "encoding" {
+							a.model.Templates[actualIndex].Config[a.model.InPlaceEditField] = newValue
+						} else {
+							// Boolean fields
+							a.model.Templates[actualIndex].Config[a.model.InPlaceEditField] = newValue == "true"
+						}
+						a.model.Output = fmt.Sprintf("%s updated to: %s", a.model.InPlaceEditField, newValue)
+					}
+				}
+				
+				a.model.ShowInPlaceEdit = false
+				a.model.InPlaceEditField = ""
+				a.model.InPlaceEditOptions = nil
+				a.model.InPlaceEditOriginalValue = nil
+				a.model.InPlaceEditSelectedIndex = 0
+				return a, nil
+			}
+			return a, nil
+		}
+
 		// Handle special cases first
 		if msg.Alt {
 			return a, nil // Skip alt combinations
@@ -469,20 +534,27 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// We're on a config field - determine which specific field
 						selectedConfigField := a.getSelectedConfigField(template, a.model.SelectedDetailField)
 						
-						// Only show reconciliation_type popup if that specific field is selected
-						if selectedConfigField == "reconciliation_type" && template.Category == "reconciliation_texts" {
-							a.model.ShowReconciliationTypePopup = true
-							a.model.SelectedReconciliationType = 0
-							// Set current selection based on current value
-							currentValue := template.Config["reconciliation_type"]
-							reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
-							for i, rType := range reconciliationTypes {
-								if currentValue == rType {
-									a.model.SelectedReconciliationType = i
+						// Check if this field is editable with in-place editing
+						if a.isFieldEditable(selectedConfigField) {
+							currentValue := template.Config[selectedConfigField]
+							options := a.getFieldEditOptions(selectedConfigField, currentValue)
+							
+							// Find current value index in options
+							currentIndex := 0
+							currentValueStr := fmt.Sprintf("%v", currentValue)
+							for i, option := range options {
+								if option == currentValueStr {
+									currentIndex = i
 									break
 								}
 							}
-							a.model.Output = "Select reconciliation type"
+							
+							a.model.ShowInPlaceEdit = true
+							a.model.InPlaceEditField = selectedConfigField
+							a.model.InPlaceEditOptions = options
+							a.model.InPlaceEditOriginalValue = currentValue
+							a.model.InPlaceEditSelectedIndex = currentIndex
+							a.model.Output = fmt.Sprintf("Select %s value (↑/↓ to change, Enter to save, Esc to cancel)", selectedConfigField)
 						}
 					} else if template.Category != "shared_parts" {
 						// We're on a text part (only for templates that support them)
@@ -710,6 +782,42 @@ func (a *app) getSelectedConfigField(template models.Template, fieldIndex int) s
 	}
 
 	return "" // Field index out of range
+}
+
+// getFieldEditOptions returns the available options for editing a field, or nil if not editable
+func (a *app) getFieldEditOptions(fieldName string, currentValue interface{}) []string {
+	switch fieldName {
+	case "public", "is_active", "use_full_width", "downloadable_as_docx", 
+		 "published", "hide_code", "externally_managed", "allow_duplicate_reconciliation":
+		return []string{"true", "false"}
+	case "reconciliation_type":
+		return []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
+	case "encoding":
+		return []string{"UTF-8", "ISO-8859-1", "Windows-1252"}
+	default:
+		return nil // Field is not editable with dropdown/toggle
+	}
+}
+
+// isFieldEditable returns true if the field can be edited with in-place editing
+func (a *app) isFieldEditable(fieldName string) bool {
+	return a.getFieldEditOptions(fieldName, nil) != nil
+}
+
+// updateConfigField updates a config field in the template's config.json file
+func (a *app) updateConfigField(templatePath, fieldName, newValue string) error {
+	// Convert string value to appropriate type
+	var value interface{}
+	switch fieldName {
+	case "public", "is_active", "use_full_width", "downloadable_as_docx", 
+		 "published", "hide_code", "externally_managed", "allow_duplicate_reconciliation":
+		value = newValue == "true"
+	default:
+		value = newValue
+	}
+	
+	// Use the existing config manager to update the field
+	return a.configManager.UpdateConfigField(templatePath, fieldName, value)
 }
 
 // buildSharedPartsMapping builds a mapping of which shared parts each template uses
