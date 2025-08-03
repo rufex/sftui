@@ -60,6 +60,11 @@ type Model struct {
 	SelectedDetailField         int
 	ShowReconciliationTypePopup bool
 	SelectedReconciliationType  int
+	SelectedTextPart            int
+	ShowTextPartPopup           bool
+	TextPartNameInput           textinput.Model
+	TextPartPathInput           textinput.Model
+	TextPartEditMode            string // "name" or "path"
 }
 
 var (

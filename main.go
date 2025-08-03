@@ -39,6 +39,17 @@ func (a *app) initialModel() *models.Model {
 	hostTextInput.CharLimit = 256
 	hostTextInput.Width = 50
 
+	// Initialize text part inputs
+	textPartNameInput := textinput.New()
+	textPartNameInput.Placeholder = "Enter text part name"
+	textPartNameInput.CharLimit = 100
+	textPartNameInput.Width = 40
+
+	textPartPathInput := textinput.New()
+	textPartPathInput.Placeholder = "Enter text part path"
+	textPartPathInput.CharLimit = 256
+	textPartPathInput.Width = 40
+
 	a.model = &models.Model{
 		CurrentSection:    models.TemplatesSection,
 		SelectedTemplate:  0,
@@ -47,6 +58,8 @@ func (a *app) initialModel() *models.Model {
 		Firm:              "No firm set",
 		Host:              "No host set",
 		HostTextInput:     hostTextInput,
+		TextPartNameInput: textPartNameInput,
+		TextPartPathInput: textPartPathInput,
 		ShowHelp:          false,
 		Output:            "Ready",
 	}
@@ -238,6 +251,47 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 
+		// Handle text part popup
+		if a.model.ShowTextPartPopup {
+			switch msg.String() {
+			case "esc":
+				a.model.ShowTextPartPopup = false
+				a.model.TextPartEditMode = ""
+				a.model.Output = "Text part edit cancelled"
+				return a, nil
+			case "tab":
+				// Switch between name and path fields
+				if a.model.TextPartEditMode == "name" {
+					a.model.TextPartEditMode = "path"
+					a.model.TextPartNameInput.Blur()
+					a.model.TextPartPathInput.Focus()
+				} else {
+					a.model.TextPartEditMode = "name"
+					a.model.TextPartPathInput.Blur()
+					a.model.TextPartNameInput.Focus()
+				}
+				return a, nil
+			case "enter":
+				// Save the text part changes (placeholder for now)
+				newName := a.model.TextPartNameInput.Value()
+				newPath := a.model.TextPartPathInput.Value()
+
+				a.model.ShowTextPartPopup = false
+				a.model.TextPartEditMode = ""
+				a.model.Output = fmt.Sprintf("Text part updated: %s -> %s", newName, newPath)
+				return a, nil
+			default:
+				// Handle text input
+				var cmd tea.Cmd
+				if a.model.TextPartEditMode == "name" {
+					a.model.TextPartNameInput, cmd = a.model.TextPartNameInput.Update(msg)
+				} else {
+					a.model.TextPartPathInput, cmd = a.model.TextPartPathInput.Update(msg)
+				}
+				return a, cmd
+			}
+		}
+
 		// Handle special cases first
 		if msg.Alt {
 			return a, nil // Skip alt combinations
@@ -404,21 +458,73 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					actualIndex := a.model.FilteredTemplates[a.model.SelectedTemplate]
 					template := a.model.Templates[actualIndex]
 
-					// Only handle reconciliation_type for reconciliation_texts
-					if template.Category == "reconciliation_texts" && a.model.SelectedDetailField == 0 {
+					// Count config fields to determine if we're on text parts
+					configFieldCount := 0
+					if template.Category == "reconciliation_texts" {
 						if _, exists := template.Config["reconciliation_type"]; exists {
-							a.model.ShowReconciliationTypePopup = true
-							a.model.SelectedReconciliationType = 0
-							// Set current selection based on current value
-							currentValue := template.Config["reconciliation_type"]
-							reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
-							for i, rType := range reconciliationTypes {
-								if currentValue == rType {
-									a.model.SelectedReconciliationType = i
-									break
+							configFieldCount = 1
+						}
+					}
+
+					if a.model.SelectedDetailField < configFieldCount {
+						// We're on a config field
+						if template.Category == "reconciliation_texts" && a.model.SelectedDetailField == 0 {
+							if _, exists := template.Config["reconciliation_type"]; exists {
+								a.model.ShowReconciliationTypePopup = true
+								a.model.SelectedReconciliationType = 0
+								// Set current selection based on current value
+								currentValue := template.Config["reconciliation_type"]
+								reconciliationTypes := []string{"can_be_reconciled_without_data", "reconciliation_not_necessary", "only_reconciled_with_data"}
+								for i, rType := range reconciliationTypes {
+									if currentValue == rType {
+										a.model.SelectedReconciliationType = i
+										break
+									}
+								}
+								a.model.Output = "Select reconciliation type"
+							}
+						}
+					} else if template.Category != "shared_parts" {
+						// We're on a text part (only for templates that support them)
+						if textPartsInterface, exists := template.Config["text_parts"]; exists {
+							if textParts, ok := textPartsInterface.(map[string]interface{}); ok {
+								textPartIndex := a.model.SelectedDetailField - configFieldCount
+
+								// Convert map to sorted slice to get the correct text part
+								type textPart struct {
+									name string
+									path string
+								}
+								var partsList []textPart
+								for name, pathInterface := range textParts {
+									if pathStr, ok := pathInterface.(string); ok {
+										partsList = append(partsList, textPart{name: name, path: pathStr})
+									}
+								}
+
+								// Sort by name for consistency
+								for i := 0; i < len(partsList); i++ {
+									for j := i + 1; j < len(partsList); j++ {
+										if partsList[i].name > partsList[j].name {
+											partsList[i], partsList[j] = partsList[j], partsList[i]
+										}
+									}
+								}
+
+								if textPartIndex < len(partsList) {
+									selectedPart := partsList[textPartIndex]
+									a.model.ShowTextPartPopup = true
+									a.model.SelectedTextPart = textPartIndex
+
+									// Initialize text inputs with current values
+									a.model.TextPartNameInput.SetValue(selectedPart.name)
+									a.model.TextPartPathInput.SetValue(selectedPart.path)
+									a.model.TextPartNameInput.Focus()
+									a.model.TextPartEditMode = "name"
+
+									a.model.Output = "Edit text part name and path"
 								}
 							}
-							a.model.Output = "Select reconciliation type"
 						}
 					}
 				}
@@ -458,6 +564,10 @@ func (a *app) View() string {
 
 	if a.model.ShowReconciliationTypePopup {
 		return a.uiRenderer.ReconciliationTypePopupView(a.model)
+	}
+
+	if a.model.ShowTextPartPopup {
+		return a.uiRenderer.TextPartPopupView(a.model)
 	}
 
 	if a.model.Height < 10 {

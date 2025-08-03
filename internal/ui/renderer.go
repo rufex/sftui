@@ -164,9 +164,14 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 	if len(template.Config) == 0 {
 		details = append(details, "  (empty)")
 	} else {
-		// Show structured config fields for reconciliation_texts
+		// Show structured config fields (only reconciliation_type for reconciliation_texts)
 		if template.Category == "reconciliation_texts" {
-			details = append(details, r.renderReconciliationTextConfig(template, m, maxWidth))
+			reconciliationConfig := r.renderReconciliationConfig(template, m, maxWidth)
+			if reconciliationConfig != "" {
+				// Split the reconciliation config into individual lines
+				reconciliationLines := strings.Split(reconciliationConfig, "\n")
+				details = append(details, reconciliationLines...)
+			}
 		} else {
 			// Fallback to JSON display for other categories
 			configJSON, _ := json.MarshalIndent(template.Config, "  ", "  ")
@@ -178,6 +183,17 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 				}
 				details = append(details, configLine)
 			}
+		}
+	}
+
+	// Show text parts as a separate section for templates that support them (but not shared_parts)
+	if template.Category != "shared_parts" {
+		textPartsSection := r.renderTextPartsSection(template, m, maxWidth)
+		if textPartsSection != "" {
+			details = append(details, "")
+			// Split the text parts section into individual lines
+			textPartsLines := strings.Split(textPartsSection, "\n")
+			details = append(details, textPartsLines...)
 		}
 	}
 
@@ -199,10 +215,10 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 	return strings.Join(details, "\n")
 }
 
-func (r *Renderer) renderReconciliationTextConfig(template models.Template, m *models.Model, maxWidth int) string {
+func (r *Renderer) renderReconciliationConfig(template models.Template, m *models.Model, maxWidth int) string {
 	var lines []string
 
-	// Only show reconciliation_type field for now
+	// Show reconciliation_type field for reconciliation_texts
 	if reconciliationType, exists := template.Config["reconciliation_type"]; exists {
 		line := fmt.Sprintf("  reconciliation_type: %v", reconciliationType)
 		if maxWidth > 0 {
@@ -211,6 +227,69 @@ func (r *Renderer) renderReconciliationTextConfig(template models.Template, m *m
 
 		// Highlight if this field is selected and we're in Details section
 		if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == 0 {
+			line = models.SelectedItemStyle.Render(line)
+		}
+
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (r *Renderer) renderTextPartsSection(template models.Template, m *models.Model, maxWidth int) string {
+	// Check if template has text_parts in config
+	textPartsInterface, exists := template.Config["text_parts"]
+	if !exists {
+		return ""
+	}
+
+	textParts, ok := textPartsInterface.(map[string]interface{})
+	if !ok || len(textParts) == 0 {
+		return ""
+	}
+
+	var lines []string
+	lines = append(lines, "Text Parts:")
+
+	// Convert map to sorted slice for consistent ordering
+	type textPart struct {
+		name string
+		path string
+	}
+	var partsList []textPart
+	for name, pathInterface := range textParts {
+		if pathStr, ok := pathInterface.(string); ok {
+			partsList = append(partsList, textPart{name: name, path: pathStr})
+		}
+	}
+
+	// Sort by name for consistency
+	for i := 0; i < len(partsList); i++ {
+		for j := i + 1; j < len(partsList); j++ {
+			if partsList[i].name > partsList[j].name {
+				partsList[i], partsList[j] = partsList[j], partsList[i]
+			}
+		}
+	}
+
+	// Calculate field index - config fields come first
+	configFieldCount := 0
+	if template.Category == "reconciliation_texts" {
+		if _, exists := template.Config["reconciliation_type"]; exists {
+			configFieldCount = 1
+		}
+	}
+
+	// Render each text part (only show name)
+	for i, part := range partsList {
+		line := fmt.Sprintf("  %s", part.name)
+		if maxWidth > 0 {
+			line = r.TruncateText(line, maxWidth)
+		}
+
+		// Highlight if this text part is selected and we're in Details section
+		fieldIndex := configFieldCount + i
+		if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == fieldIndex {
 			line = models.SelectedItemStyle.Render(line)
 		}
 
@@ -521,6 +600,93 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (r *Renderer) TextPartPopupView(m *models.Model) string {
+	// Get current template and text part
+	if len(m.FilteredTemplates) == 0 || m.SelectedTemplate >= len(m.FilteredTemplates) {
+		return ""
+	}
+
+	actualIndex := m.FilteredTemplates[m.SelectedTemplate]
+	template := m.Templates[actualIndex]
+
+	textPartsInterface, exists := template.Config["text_parts"]
+	if !exists {
+		return ""
+	}
+
+	textParts, ok := textPartsInterface.(map[string]interface{})
+	if !ok || len(textParts) == 0 {
+		return ""
+	}
+
+	// Convert to sorted slice
+	type textPart struct {
+		name string
+		path string
+	}
+	var partsList []textPart
+	for name, pathInterface := range textParts {
+		if pathStr, ok := pathInterface.(string); ok {
+			partsList = append(partsList, textPart{name: name, path: pathStr})
+		}
+	}
+
+	// Sort by name
+	for i := 0; i < len(partsList); i++ {
+		for j := i + 1; j < len(partsList); j++ {
+			if partsList[i].name > partsList[j].name {
+				partsList[i], partsList[j] = partsList[j], partsList[i]
+			}
+		}
+	}
+
+	if m.SelectedTextPart >= len(partsList) {
+		return ""
+	}
+
+	// Build popup content
+	var content strings.Builder
+	content.WriteString("Edit Text Part\n\n")
+
+	content.WriteString("Name: ")
+	content.WriteString(m.TextPartNameInput.View())
+	content.WriteString("\n\n")
+
+	content.WriteString("Path: ")
+	content.WriteString(m.TextPartPathInput.View())
+	content.WriteString("\n\n")
+
+	content.WriteString("Use TAB to switch between fields")
+	content.WriteString("\nPress ENTER to save, ESC to cancel")
+
+	// Calculate popup dimensions
+	popupWidth := 60
+	popupHeight := 12
+
+	// Center the popup
+	leftMargin := max(0, (m.Width-popupWidth)/2)
+	topMargin := max(0, (m.Height-popupHeight)/2)
+
+	popupBox := models.ActiveBorderStyle.
+		Width(popupWidth).
+		Height(popupHeight).
+		Padding(1).
+		Render(content.String())
+
+	// Add top margin using newlines
+	centeredPopup := strings.Repeat("\n", topMargin) + popupBox
+
+	// Add left margin using spaces
+	lines := strings.Split(centeredPopup, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = strings.Repeat(" ", leftMargin) + line
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func max(a, b int) int {

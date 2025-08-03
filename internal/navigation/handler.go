@@ -94,28 +94,94 @@ func (h *Handler) HandleDetailsNavigation(m *models.Model, direction string) {
 	actualIndex := m.FilteredTemplates[m.SelectedTemplate]
 	template := m.Templates[actualIndex]
 
-	// Count available config fields for navigation
-	fieldCount := h.GetConfigFieldCount(template)
-	if fieldCount == 0 {
+	// Count config fields (currently only reconciliation_type for reconciliation_texts)
+	configFieldCount := 0
+	if template.Category == "reconciliation_texts" {
+		if _, exists := template.Config["reconciliation_type"]; exists {
+			configFieldCount = 1
+		}
+	}
+
+	// Count text parts
+	textPartsCount := h.GetTextPartsCount(template)
+
+	totalFieldCount := configFieldCount + textPartsCount
+	if totalFieldCount == 0 {
 		return
 	}
 
 	switch direction {
 	case "up":
-		m.SelectedDetailField = (m.SelectedDetailField - 1 + fieldCount) % fieldCount
+		m.SelectedDetailField = (m.SelectedDetailField - 1 + totalFieldCount) % totalFieldCount
 	case "down":
-		m.SelectedDetailField = (m.SelectedDetailField + 1) % fieldCount
+		m.SelectedDetailField = (m.SelectedDetailField + 1) % totalFieldCount
+	}
+
+	// Update text part selection based on which field is selected
+	if m.SelectedDetailField >= configFieldCount {
+		// We're in the text parts section
+		m.SelectedTextPart = m.SelectedDetailField - configFieldCount
+	} else {
+		// We're in the config section
+		m.SelectedTextPart = -1 // No text part selected
 	}
 }
 
 func (h *Handler) GetConfigFieldCount(template models.Template) int {
-	// For reconciliation_texts, we only show reconciliation_type field
+	count := 0
+
+	// For reconciliation_texts, we show reconciliation_type field
 	if template.Category == "reconciliation_texts" {
 		if _, exists := template.Config["reconciliation_type"]; exists {
-			return 1
+			count++
+		}
+	}
+
+	// Add text parts count (for templates that support them, excluding shared_parts)
+	if template.Category != "shared_parts" {
+		if textPartsInterface, exists := template.Config["text_parts"]; exists {
+			if textParts, ok := textPartsInterface.(map[string]interface{}); ok {
+				count += len(textParts)
+			}
+		}
+	}
+
+	return count
+}
+
+func (h *Handler) GetTextPartsCount(template models.Template) int {
+	if template.Category == "shared_parts" {
+		return 0
+	}
+
+	if textPartsInterface, exists := template.Config["text_parts"]; exists {
+		if textParts, ok := textPartsInterface.(map[string]interface{}); ok {
+			return len(textParts)
 		}
 	}
 	return 0
+}
+
+func (h *Handler) HandleTextPartNavigation(m *models.Model, direction string) {
+	if m.CurrentSection != models.DetailsSection || len(m.FilteredTemplates) == 0 {
+		return
+	}
+
+	// Get actual template index from filtered list
+	actualIndex := m.FilteredTemplates[m.SelectedTemplate]
+	template := m.Templates[actualIndex]
+
+	textPartsCount := h.GetTextPartsCount(template)
+	if textPartsCount == 0 {
+		return
+	}
+
+	switch direction {
+	case "up":
+		m.SelectedTextPart = (m.SelectedTextPart - 1 + textPartsCount) % textPartsCount
+	case "down":
+		m.SelectedTextPart = (m.SelectedTextPart + 1) % textPartsCount
+	}
 }
 
 func (h *Handler) NextSection(m *models.Model) {

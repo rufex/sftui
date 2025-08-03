@@ -971,17 +971,28 @@ func TestDetailsNavigation(t *testing.T) {
 		t.Errorf("Expected initial SelectedDetailField to be 0, got %d", m.SelectedDetailField)
 	}
 
-	// Test that navigation works
+	// Test that navigation works - now includes text parts
 	navHandler := navigation.NewHandler()
-	navHandler.HandleDetailsNavigation(m, "down")
-	// Since there's only one field, it should wrap to 0
-	if m.SelectedDetailField != 0 {
-		t.Errorf("Expected SelectedDetailField to remain 0 after down navigation, got %d", m.SelectedDetailField)
+	template := m.Templates[reconciliationIndex]
+
+	// Count total fields (config fields + text parts)
+	totalFields := 1 // reconciliation_type
+	if textPartsInterface, exists := template.Config["text_parts"]; exists {
+		if textParts, ok := textPartsInterface.(map[string]interface{}); ok {
+			totalFields += len(textParts)
+		}
 	}
 
+	navHandler.HandleDetailsNavigation(m, "down")
+	// Should move to next field
+	if m.SelectedDetailField != 1 {
+		t.Errorf("Expected SelectedDetailField to be 1 after down navigation, got %d", m.SelectedDetailField)
+	}
+
+	// Navigate back up
 	navHandler.HandleDetailsNavigation(m, "up")
 	if m.SelectedDetailField != 0 {
-		t.Errorf("Expected SelectedDetailField to remain 0 after up navigation, got %d", m.SelectedDetailField)
+		t.Errorf("Expected SelectedDetailField to be 0 after up navigation, got %d", m.SelectedDetailField)
 	}
 }
 
@@ -1183,17 +1194,36 @@ func TestUpDownNavigationInDetailsSection(t *testing.T) {
 	keyMsg := tea.KeyMsg{Type: tea.KeyDown}
 	_, _ = app.Update(keyMsg)
 
-	// With only one field, should remain the same
-	if m.SelectedDetailField != initialField {
-		t.Errorf("Expected SelectedDetailField to remain %d with single field, got %d", initialField, m.SelectedDetailField)
+	// Now we have multiple fields (reconciliation_type + text parts), so should move to next field
+	template := m.Templates[reconciliationIndex]
+
+	// Count total fields
+	totalFields := 1 // reconciliation_type
+	if textPartsInterface, exists := template.Config["text_parts"]; exists {
+		if textParts, ok := textPartsInterface.(map[string]interface{}); ok {
+			totalFields += len(textParts)
+		}
+	}
+
+	if totalFields > 1 {
+		// Should move to next field
+		if m.SelectedDetailField != 1 {
+			t.Errorf("Expected SelectedDetailField to be 1 with multiple fields, got %d", m.SelectedDetailField)
+		}
+	} else {
+		// With only one field, should remain the same
+		if m.SelectedDetailField != initialField {
+			t.Errorf("Expected SelectedDetailField to remain %d with single field, got %d", initialField, m.SelectedDetailField)
+		}
 	}
 
 	// Simulate up key
 	keyMsg = tea.KeyMsg{Type: tea.KeyUp}
 	_, _ = app.Update(keyMsg)
 
+	// Should go back to initial field
 	if m.SelectedDetailField != initialField {
-		t.Errorf("Expected SelectedDetailField to remain %d with single field, got %d", initialField, m.SelectedDetailField)
+		t.Errorf("Expected SelectedDetailField to return to %d after up navigation, got %d", initialField, m.SelectedDetailField)
 	}
 }
 
