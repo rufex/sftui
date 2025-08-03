@@ -1263,7 +1263,9 @@ func TestGetConfigFieldCount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			count := navHandler.GetConfigFieldCount(test.template)
+			// Create empty shared parts usage for testing
+			sharedPartsUsage := make(map[string][]string)
+			count := navHandler.GetConfigFieldCount(test.template, sharedPartsUsage)
 			if count != test.expectedCount {
 				t.Errorf("Expected count %d, got %d", test.expectedCount, count)
 			}

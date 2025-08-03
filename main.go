@@ -62,6 +62,7 @@ func (a *app) initialModel() *models.Model {
 		TextPartPathInput: textPartPathInput,
 		ShowHelp:          false,
 		Output:            "Ready",
+		SharedPartsUsage:  make(map[string][]string),
 	}
 
 	// Load Silverfin config
@@ -80,6 +81,9 @@ func (a *app) initialModel() *models.Model {
 
 	// Load templates
 	a.model.Templates = a.templateManager.LoadTemplates()
+
+	// Build shared parts usage mapping
+	a.buildSharedPartsMapping()
 
 	// Initialize filtered templates to show all templates
 	a.model.FilteredTemplates = a.templateManager.FilterTemplates(a.model.Templates, "")
@@ -648,6 +652,55 @@ func (a *app) View() string {
 		return lipgloss.JoinVertical(lipgloss.Left, searchBar, topRow, mainRow, outputBox, statusBar)
 	} else {
 		return lipgloss.JoinVertical(lipgloss.Left, topRow, mainRow, outputBox, statusBar)
+	}
+}
+
+// buildSharedPartsMapping builds a mapping of which shared parts each template uses
+// by analyzing the used_in field of all shared parts
+func (a *app) buildSharedPartsMapping() {
+	// Initialize the mapping
+	a.model.SharedPartsUsage = make(map[string][]string)
+
+	// Find all shared parts templates
+	for _, template := range a.model.Templates {
+		if template.Category == "shared_parts" {
+			// Check if this shared part has a used_in section
+			if usedInInterface, exists := template.Config["used_in"]; exists {
+				if usedInArray, ok := usedInInterface.([]interface{}); ok {
+					// Process each usage entry
+					for _, usageInterface := range usedInArray {
+						if usage, ok := usageInterface.(map[string]interface{}); ok {
+							// Get the type and handle from the usage entry
+							if typeStr, typeExists := usage["type"].(string); typeExists {
+								if handleStr, handleExists := usage["handle"].(string); handleExists {
+									// Convert type to match template categories
+									var templateCategory string
+									switch typeStr {
+									case "reconciliation_text":
+										templateCategory = "reconciliation_texts"
+									case "export_file":
+										templateCategory = "export_files"
+									case "account_template":
+										templateCategory = "account_templates"
+									default:
+										continue // Skip unknown types
+									}
+
+									// Create a unique template identifier
+									templateKey := templateCategory + "/" + handleStr
+
+									// Add this shared part to the template's list
+									if a.model.SharedPartsUsage[templateKey] == nil {
+										a.model.SharedPartsUsage[templateKey] = []string{}
+									}
+									a.model.SharedPartsUsage[templateKey] = append(a.model.SharedPartsUsage[templateKey], template.Name)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 }
 

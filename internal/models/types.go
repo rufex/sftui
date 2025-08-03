@@ -64,7 +64,8 @@ type Model struct {
 	ShowTextPartPopup           bool
 	TextPartNameInput           textinput.Model
 	TextPartPathInput           textinput.Model
-	TextPartEditMode            string // "name" or "path"
+	TextPartEditMode            string              // "name" or "path"
+	SharedPartsUsage            map[string][]string // maps template handle to shared part names
 }
 
 var (

@@ -105,7 +105,10 @@ func (h *Handler) HandleDetailsNavigation(m *models.Model, direction string) {
 	// Count text parts
 	textPartsCount := h.GetTextPartsCount(template)
 
-	totalFieldCount := configFieldCount + textPartsCount
+	// Count shared parts
+	sharedPartsCount := h.GetSharedPartsCount(template, m.SharedPartsUsage)
+
+	totalFieldCount := configFieldCount + textPartsCount + sharedPartsCount
 	if totalFieldCount == 0 {
 		return
 	}
@@ -127,7 +130,7 @@ func (h *Handler) HandleDetailsNavigation(m *models.Model, direction string) {
 	}
 }
 
-func (h *Handler) GetConfigFieldCount(template models.Template) int {
+func (h *Handler) GetConfigFieldCount(template models.Template, sharedPartsUsage map[string][]string) int {
 	count := 0
 
 	// For reconciliation_texts, we show reconciliation_type field
@@ -146,7 +149,22 @@ func (h *Handler) GetConfigFieldCount(template models.Template) int {
 		}
 	}
 
+	// Add shared parts count
+	count += h.GetSharedPartsCount(template, sharedPartsUsage)
+
 	return count
+}
+
+func (h *Handler) GetSharedPartsCount(template models.Template, sharedPartsUsage map[string][]string) int {
+	if template.Category == "shared_parts" {
+		return 0
+	}
+
+	templateKey := template.Category + "/" + template.Name
+	if sharedParts, exists := sharedPartsUsage[templateKey]; exists {
+		return len(sharedParts)
+	}
+	return 0
 }
 
 func (h *Handler) GetTextPartsCount(template models.Template) int {

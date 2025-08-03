@@ -197,6 +197,17 @@ func (r *Renderer) detailsViewWithHeightAndWidth(m *models.Model, maxHeight, max
 		}
 	}
 
+	// Show shared parts as a separate section for templates that can use them (but not shared_parts themselves)
+	if template.Category != "shared_parts" {
+		sharedPartsSection := r.renderSharedPartsSection(template, m, maxWidth)
+		if sharedPartsSection != "" {
+			details = append(details, "")
+			// Split the shared parts section into individual lines
+			sharedPartsLines := strings.Split(sharedPartsSection, "\n")
+			details = append(details, sharedPartsLines...)
+		}
+	}
+
 	// If no height limit, return all details
 	if maxHeight <= 0 {
 		return strings.Join(details, "\n")
@@ -289,6 +300,69 @@ func (r *Renderer) renderTextPartsSection(template models.Template, m *models.Mo
 
 		// Highlight if this text part is selected and we're in Details section
 		fieldIndex := configFieldCount + i
+		if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == fieldIndex {
+			line = models.SelectedItemStyle.Render(line)
+		}
+
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (r *Renderer) renderSharedPartsSection(template models.Template, m *models.Model, maxWidth int) string {
+	// Only show for templates that can use shared parts (not shared parts themselves)
+	if template.Category == "shared_parts" {
+		return ""
+	}
+
+	// Create template key to look up shared parts
+	templateKey := template.Category + "/" + template.Name
+
+	// Get shared parts for this template
+	sharedParts, exists := m.SharedPartsUsage[templateKey]
+	if !exists || len(sharedParts) == 0 {
+		return ""
+	}
+
+	var lines []string
+	lines = append(lines, "Shared Parts:")
+
+	// Calculate field index - config fields and text parts come first
+	configFieldCount := 0
+	if template.Category == "reconciliation_texts" {
+		if _, exists := template.Config["reconciliation_type"]; exists {
+			configFieldCount = 1
+		}
+	}
+
+	textPartsCount := 0
+	if textPartsInterface, exists := template.Config["text_parts"]; exists {
+		if textParts, ok := textPartsInterface.(map[string]interface{}); ok {
+			textPartsCount = len(textParts)
+		}
+	}
+
+	// Sort shared parts for consistent display
+	sortedSharedParts := make([]string, len(sharedParts))
+	copy(sortedSharedParts, sharedParts)
+	for i := 0; i < len(sortedSharedParts); i++ {
+		for j := i + 1; j < len(sortedSharedParts); j++ {
+			if sortedSharedParts[i] > sortedSharedParts[j] {
+				sortedSharedParts[i], sortedSharedParts[j] = sortedSharedParts[j], sortedSharedParts[i]
+			}
+		}
+	}
+
+	// Render each shared part (only show name)
+	for i, sharedPartName := range sortedSharedParts {
+		line := fmt.Sprintf("  %s", sharedPartName)
+		if maxWidth > 0 {
+			line = r.TruncateText(line, maxWidth)
+		}
+
+		// Highlight if this shared part is selected and we're in Details section
+		fieldIndex := configFieldCount + textPartsCount + i
 		if m.CurrentSection == models.DetailsSection && m.SelectedDetailField == fieldIndex {
 			line = models.SelectedItemStyle.Render(line)
 		}
