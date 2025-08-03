@@ -1,0 +1,14 @@
+{
+  "id": {
+    "1001": 60001,
+    "1002": 61001
+  },
+  "partner_id": {
+    "25": 601,
+    "26": 611
+  },
+  "text_parts": {
+    "part_1": "text_parts/part_1.liquid",
+    "part_2": "text_parts/part_2.liquid"
+  }
+}

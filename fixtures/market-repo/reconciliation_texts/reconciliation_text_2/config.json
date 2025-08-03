@@ -1,3 +1,31 @@
 {
-  "reconciliation_type": "reconciliation_not_necessary"
+  "id": {
+    "1001": 75002,
+    "1002": 85002
+  },
+  "partner_id": {
+    "25": 1002,
+    "26": 2002
+  },
+  "test": "tests/reconciliation_text_2_liquid_test.yml",
+  "handle": "reconciliation_text_2",
+  "name_en": "Reconciliation Text 2",
+  "name_nl": "Reconciliation Text 2",
+  "name_de": "Reconciliation Text 2",
+  "name_fr": "Reconciliation Text 2",
+  "name_es": "Reconciliation Text 2",
+  "auto_hide_formula": "",
+  "virtual_account_number": "100002",
+  "reconciliation_type": "reconciliation_not_necessary",
+  "public": false,
+  "allow_duplicate_reconciliations": false,
+  "is_active": true,
+  "externally_managed": true,
+  "published": false,
+  "hide_code": true,
+  "use_full_width": false,
+  "downloadable_as_docx": false,
+  "text": "main.liquid",
+  "text_parts": {}
 }
+

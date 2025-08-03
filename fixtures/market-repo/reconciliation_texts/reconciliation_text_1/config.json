@@ -1,3 +1,34 @@
 {
-  "reconciliation_type": "can_be_reconciled_without_data"
+  "id": {
+    "1001": 75001,
+    "1002": 85001
+  },
+  "partner_id": {
+    "25": 1001,
+    "26": 2001
+  },
+  "test": "tests/reconciliation_text_1_liquid_test.yml",
+  "handle": "reconciliation_text_1",
+  "name_en": "Reconciliation Text 1",
+  "name_nl": "Reconciliation Text 1",
+  "name_de": "Reconciliation Text 1",
+  "name_fr": "Reconciliation Text 1",
+  "name_es": "Reconciliation Text 1",
+  "auto_hide_formula": "period.fiscal_year < 2020",
+  "virtual_account_number": "100001",
+  "reconciliation_type": "can_be_reconciled_without_data",
+  "public": false,
+  "allow_duplicate_reconciliations": false,
+  "is_active": true,
+  "externally_managed": true,
+  "published": false,
+  "hide_code": true,
+  "use_full_width": false,
+  "downloadable_as_docx": false,
+  "text": "main.liquid",
+  "text_parts": {
+    "part_1": "text_parts/part_1.liquid",
+    "part_2": "text_parts/part_2.liquid"
+  }
 }
+
