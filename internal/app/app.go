@@ -95,11 +95,11 @@ func (a *App) buildSharedPartsMapping() {
 								if handleStr, handleExists := usage["handle"].(string); handleExists {
 									var templateCategory string
 									switch typeStr {
-									case "reconciliation_text":
+									case "reconciliation_text", "reconciliationText", "reconciliation":
 										templateCategory = "reconciliation_texts"
-									case "export_file":
+									case "export_file", "exportFile":
 										templateCategory = "export_files"
-									case "account_template":
+									case "account_template", "accountTemplate":
 										templateCategory = "account_templates"
 									default:
 										continue

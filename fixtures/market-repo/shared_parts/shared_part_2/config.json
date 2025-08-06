@@ -15,7 +15,7 @@
         "1001": 768002,
         "1002": 888002
       },
-      "type": "reconciliation_text",
+      "type": "reconciliationText",
       "handle": "reconciliation_text_2",
       "partner_id": {
         "25": 4562,
